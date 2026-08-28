@@ -14,17 +14,20 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://jansetu-citizen-grievance.myacc5010.chatgpt.site"),
   title: "JanSetu — Your grievance, clearly heard",
   description: "Describe, file and track a public grievance in plain language.",
   openGraph: {
     title: "JanSetu — Your grievance, clearly heard",
     description: "Your voice. The right desk. A clear answer.",
     type: "website",
+    images: [{ url: "/og.png", width: 1675, height: 941, alt: "JanSetu — Your voice. The right desk. A clear answer." }],
   },
   twitter: {
     card: "summary_large_image",
     title: "JanSetu — Your grievance, clearly heard",
     description: "Your voice. The right desk. A clear answer.",
+    images: ["/og.png"],
   },
   icons: {
     icon: "/favicon.svg",
