@@ -31,6 +31,10 @@ function demoAnalysis(text: string) {
 }
 
 export async function POST(request: Request) {
+  const cookie = request.headers.get("cookie") || "";
+  if (!cookie.includes("jansetu_human=1") || !cookie.includes("jansetu_digilocker=")) {
+    return Response.json({ error: "Identity and CAPTCHA verification are required." }, { status: 403 });
+  }
   const { description } = (await request.json()) as { description?: string };
   if (!description || description.trim().length < 10) {
     return Response.json({ error: "Please add a little more detail." }, { status: 400 });

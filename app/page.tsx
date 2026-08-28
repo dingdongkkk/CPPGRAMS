@@ -52,6 +52,11 @@ export default function Home() {
   const [gpsLocation, setGpsLocation] = useState<GpsLocation | null>(null);
   const [locating, setLocating] = useState(false);
   const [permissionPrompt, setPermissionPrompt] = useState(true);
+  const [showSecurityGate, setShowSecurityGate] = useState(false);
+  const [digiVerified, setDigiVerified] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState("");
+  const [captchaMode, setCaptchaMode] = useState<"demo" | "live">("demo");
+  const [securityLoading, setSecurityLoading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const voiceBaseRef = useRef("");
@@ -63,6 +68,11 @@ export default function Home() {
   useEffect(() => {
     const draft = localStorage.getItem("jansetu-draft");
     if (draft) setDescription(draft);
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("digilocker") === "verified" || params.get("digilocker") === "demo-verified") {
+      setDigiVerified(true); setShowSecurityGate(true);
+      window.history.replaceState({}, "", "/");
+    }
   }, []);
   useEffect(() => {
     if (description) localStorage.setItem("jansetu-draft", description);
@@ -168,6 +178,18 @@ export default function Home() {
     getGpsLocation();
   }
 
+  async function completeSecurityCheck() {
+    if (!digiVerified) { setToast("Verify with DigiLocker before continuing."); return; }
+    if (!captchaToken) { setToast("Complete the CAPTCHA before continuing."); return; }
+    setSecurityLoading(true);
+    try {
+      const response = await fetch("/api/captcha/verify", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ token:captchaToken }) });
+      if (!response.ok) throw new Error("captcha failed");
+      setShowSecurityGate(false); setScreen("describe"); setToast("Identity and human check complete.");
+    } catch { setToast("CAPTCHA verification failed or expired. Please try it again."); setCaptchaToken(""); }
+    finally { setSecurityLoading(false); }
+  }
+
   if (screen === "home") return (
     <main className="homePage">
       <Header language={language} setLanguage={setLanguage} />
@@ -177,7 +199,7 @@ export default function Home() {
           <h1>{hi ? "आपकी आवाज़। सही जगह। साफ़ जवाब।" : "Your voice. The right desk. A clear answer."}</h1>
           <p>{hi ? "अपनी समस्या आसान भाषा में बताएँ। हम सही विभाग चुनने, शिकायत लिखने और हर कदम समझने में मदद करेंगे।" : "Tell us the problem in your own words. We’ll help route it, write it clearly, and show you what happens at every step."}</p>
           <div className="homeActions">
-            <button className="primary compact" onClick={() => setScreen("describe")}>{t.start}<span>→</span></button>
+            <button className="primary compact" onClick={() => setShowSecurityGate(true)}>{t.start}<span>→</span></button>
             <button className="secondary" onClick={() => { setAnalysis({ department:"Delhi Jal Board", category:"Water supply", location:"Shastri Nagar", issueType:"Water supply disruption", keyDetails:[], summary:"No water supply for three days in Shastri Nagar.", source:"demo" }); setStage(2); setScreen("track"); }}>{t.existing}</button>
           </div>
           <div className="trustRow"><span>✓ No Aadhaar needed</span><span>✓ Save and return</span><span>✓ Hindi + English</span></div>
@@ -188,6 +210,7 @@ export default function Home() {
         </div>
       </section>
       <section className="loginStrip"><div><span className="avatar">AV</span><label htmlFor="demoName">Demo citizen</label><input id="demoName" value={name} onChange={(e)=>setName(e.target.value)} /></div><p>🔒 This prototype uses no real personal or government data.</p></section>
+      {showSecurityGate && <SecurityGate digiVerified={digiVerified} captchaToken={captchaToken} setCaptchaToken={setCaptchaToken} captchaMode={captchaMode} setCaptchaMode={setCaptchaMode} loading={securityLoading} close={()=>setShowSecurityGate(false)} complete={completeSecurityCheck} />}
     </main>
   );
 
@@ -212,6 +235,10 @@ export default function Home() {
     </main>
   );
 }
+
+function SecurityGate({digiVerified,captchaToken,setCaptchaToken,captchaMode,setCaptchaMode,loading,close,complete}:{digiVerified:boolean;captchaToken:string;setCaptchaToken:(v:string)=>void;captchaMode:"demo"|"live";setCaptchaMode:(v:"demo"|"live")=>void;loading:boolean;close:()=>void;complete:()=>void}) { return <div className="securityOverlay" role="dialog" aria-modal="true" aria-labelledby="security-title"><section className="securityGate"><button className="gateClose" onClick={close} aria-label="Close">×</button><div className="securityHeading"><span>✓</span><div><em>SECURE FILING</em><h2 id="security-title">Verify before filing</h2><p>Two quick checks protect your identity and stop automated spam.</p></div></div><div className={`securityStep ${digiVerified?"complete":""}`}><span className="securityNumber">{digiVerified?"✓":"1"}</span><div><div className="securityStepTitle"><b>DigiLocker identity verification</b><em>{digiVerified?"VERIFIED": "REQUIRED"}</em></div><p>You will be redirected to DigiLocker. JanSetu never asks for or stores your DigiLocker password.</p>{digiVerified?<div className="verifiedIdentity"><b>✓ Identity verified</b><small>{captchaMode==="demo"?"Hackathon demo identity · no real personal data":"Verified securely through DigiLocker"}</small></div>:<a className="digiButton" href="/api/digilocker/start"><span className="digiMark">D</span><span>Verify with DigiLocker<small>Secure government identity service</small></span><b>→</b></a>}</div></div><div className={`securityStep ${captchaToken?"complete":""}`}><span className="securityNumber">{captchaToken?"✓":"2"}</span><div><div className="securityStepTitle"><b>Human verification</b><em>{captchaToken?"COMPLETE":"REQUIRED"}</em></div><p>Complete the privacy-friendly CAPTCHA. The answer is checked securely on the server.</p><CaptchaWidget onToken={setCaptchaToken} onMode={setCaptchaMode}/><small className="modeNote">{captchaMode==="demo"?"Demo CAPTCHA keys · replace with production Turnstile keys before real rollout":"Live Cloudflare Turnstile protection"}</small></div></div><div className="securityPrivacy"><span>🔒</span><p><b>Privacy first</b><br/>Only verification status is used for this prototype. No Aadhaar number, documents, or DigiLocker credentials are stored.</p></div><button className="primary gateContinue" disabled={!digiVerified||!captchaToken||loading} onClick={complete}>{loading?"Checking…":"Continue to complaint"}<span>→</span></button></section></div> }
+
+function CaptchaWidget({onToken,onMode}:{onToken:(token:string)=>void;onMode:(mode:"demo"|"live")=>void}) { const container=useRef<HTMLDivElement>(null); const rendered=useRef(false); useEffect(()=>{let cancelled=false;let timer:number;async function load(){try{const config=await fetch("/api/captcha/config").then(r=>r.json()) as {siteKey:string;mode:"demo"|"live"};if(cancelled)return;onMode(config.mode);const attempt=()=>{const w=window as typeof window&{turnstile?:{render:(el:HTMLElement,options:Record<string,unknown>)=>string}};if(w.turnstile&&container.current&&!rendered.current){rendered.current=true;w.turnstile.render(container.current,{sitekey:config.siteKey,theme:"light",size:"flexible",action:"file_grievance",callback:(token:string)=>onToken(token),"expired-callback":()=>onToken(""),"error-callback":()=>onToken("")});}else if(!cancelled&&!rendered.current)timer=window.setTimeout(attempt,250)};attempt()}catch{onToken("")}}load();return()=>{cancelled=true;if(timer)window.clearTimeout(timer)}},[onToken,onMode]);return <div className="captchaShell"><div ref={container}/></div> }
 
 function Header({language,setLanguage,onHome}:{language:"en"|"hi";setLanguage:(l:"en"|"hi")=>void;onHome?:()=>void}) { const hi=language==="hi"; return <header className="siteHeader"><button className="brand brandButton" onClick={onHome} aria-label="JanSetu home"><span className="brandMark">ज</span><span>JanSetu <small>जनसेतु</small></span></button><div className="headerRight"><span className="demoChip">DEMO SERVICE</span><button className="languageButton" onClick={()=>setLanguage(hi?"en":"hi")}>अ / A&nbsp;&nbsp; {hi?"English":"हिन्दी"}</button></div></header> }
 function Journey({progress,language}:{progress:number;language:"en"|"hi"}) { const labels=language==="hi"?["समस्या बताएँ","जाँचें","स्थिति देखें","पुष्टि करें"]:["Describe","Review","Track","Confirm"]; return <nav className="journey" aria-label="Grievance journey">{labels.map((label,i)=><span key={label} className={i<=progress?"active":""}><b>{i<progress?"✓":i+1}</b><em>{label}</em>{i<3&&<i />}</span>)}</nav> }
