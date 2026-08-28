@@ -4,6 +4,24 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 type Screen = "home" | "describe" | "review" | "track" | "confirm" | "appeal" | "appeal-track" | "closed";
 type Analysis = { department: string; category: string; location: string; issueType: string; keyDetails: string[]; summary: string; source?: string };
+type GpsLocation = { latitude: number; longitude: number; accuracy: number; label: string };
+type SpeechResultEvent = { resultIndex: number; results: ArrayLike<{ isFinal: boolean; 0: { transcript: string } }> };
+type SpeechRecognitionLike = {
+  lang: string; continuous: boolean; interimResults: boolean; maxAlternatives: number;
+  start: () => void; stop: () => void;
+  onstart: (() => void) | null; onend: (() => void) | null;
+  onresult: ((event: SpeechResultEvent) => void) | null;
+  onerror: ((event: { error: string }) => void) | null;
+};
+
+const voiceLanguages = [
+  ["auto", "Auto — device language"], ["en-IN", "English (India)"], ["hi-IN", "हिन्दी"],
+  ["bn-IN", "বাংলা"], ["te-IN", "తెలుగు"], ["mr-IN", "मराठी"], ["ta-IN", "தமிழ்"],
+  ["gu-IN", "ગુજરાતી"], ["kn-IN", "ಕನ್ನಡ"], ["ml-IN", "മലയാളം"], ["pa-IN", "ਪੰਜਾਬੀ"],
+  ["ur-IN", "اردو"], ["or-IN", "ଓଡ଼ିଆ"], ["as-IN", "অসমীয়া"], ["ne-NP", "नेपाली"],
+  ["es-ES", "Español"], ["fr-FR", "Français"], ["de-DE", "Deutsch"], ["ar-SA", "العربية"],
+  ["zh-CN", "中文"], ["ja-JP", "日本語"], ["ko-KR", "한국어"], ["pt-BR", "Português"],
+] as const;
 
 const stages = [
   { title: "Filed", hi: "दर्ज हुई", detail: "Your complaint was received safely.", sla: "Instant" },
@@ -30,7 +48,14 @@ export default function Home() {
   const [files, setFiles] = useState<string[]>([]);
   const [appealReason, setAppealReason] = useState("");
   const [listening, setListening] = useState(false);
+  const [voiceLanguage, setVoiceLanguage] = useState("auto");
+  const [gpsLocation, setGpsLocation] = useState<GpsLocation | null>(null);
+  const [locating, setLocating] = useState(false);
+  const [permissionPrompt, setPermissionPrompt] = useState(true);
   const fileRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const voiceBaseRef = useRef("");
+  const voiceFinalRef = useRef("");
   const t = copy[language];
   const hi = language === "hi";
   const grievanceId = "JS-2026-0828-1047";
@@ -56,7 +81,8 @@ export default function Home() {
     try {
       const response = await fetch("/api/analyze", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ description }) });
       if (!response.ok) throw new Error("Could not analyse");
-      setAnalysis(await response.json());
+      const result = await response.json() as Analysis;
+      setAnalysis(gpsLocation ? { ...result, location: gpsLocation.label } : result);
       setScreen("review");
     } catch {
       setToast(hi ? "अभी शिकायत तैयार नहीं हो सकी। फिर कोशिश करें।" : "We couldn’t prepare this just now. Please try again.");
@@ -77,11 +103,69 @@ export default function Home() {
   }
 
   function startVoice() {
-    const w = window as typeof window & { webkitSpeechRecognition?: new () => { lang:string; interimResults:boolean; start:()=>void; onresult:(e:{results:ArrayLike<{0:{transcript:string}}>} )=>void; onend:()=>void } };
-    if (!w.webkitSpeechRecognition) { setToast("Voice input is not available in this browser. You can type instead."); return; }
-    const recognition = new w.webkitSpeechRecognition(); recognition.lang = hi ? "hi-IN" : "en-IN"; recognition.interimResults = false;
-    recognition.onresult = (event) => setDescription((current) => `${current} ${event.results[0][0].transcript}`.trim());
-    recognition.onend = () => setListening(false); setListening(true); recognition.start();
+    if (listening && recognitionRef.current) { recognitionRef.current.stop(); return; }
+    const speechWindow = window as typeof window & {
+      SpeechRecognition?: new () => SpeechRecognitionLike;
+      webkitSpeechRecognition?: new () => SpeechRecognitionLike;
+    };
+    const Recognition = speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
+    if (!Recognition) {
+      setToast("Voice typing is not supported by this browser. Open this public link in Chrome, Edge or Safari and allow microphone access.");
+      return;
+    }
+    const recognition = new Recognition();
+    recognitionRef.current = recognition;
+    recognition.lang = voiceLanguage === "auto" ? (navigator.language || (hi ? "hi-IN" : "en-IN")) : voiceLanguage;
+    recognition.continuous = true; recognition.interimResults = true; recognition.maxAlternatives = 1;
+    voiceBaseRef.current = description.trim(); voiceFinalRef.current = "";
+    recognition.onstart = () => { setListening(true); setToast(`Microphone is on · Speak in ${recognition.lang}`); };
+    recognition.onresult = (event) => {
+      let interim = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const words = event.results[i][0].transcript;
+        if (event.results[i].isFinal) voiceFinalRef.current += `${words} `; else interim += words;
+      }
+      setDescription([voiceBaseRef.current, voiceFinalRef.current.trim(), interim.trim()].filter(Boolean).join(" "));
+    };
+    recognition.onerror = (event) => {
+      setListening(false);
+      const message = event.error === "not-allowed" || event.error === "service-not-allowed"
+        ? "Microphone permission is blocked. Allow microphone access in your browser’s site settings, then try again."
+        : event.error === "no-speech" ? "I couldn’t hear speech. Move closer to the microphone and try again."
+        : `Voice typing stopped (${event.error}). Please try again.`;
+      setToast(message);
+    };
+    recognition.onend = () => { setListening(false); recognitionRef.current = null; };
+    try { recognition.start(); } catch { setListening(false); setToast("The microphone is already starting. Please wait a moment."); }
+  }
+
+  function getGpsLocation() {
+    if (!navigator.geolocation) { setToast("GPS location is not supported on this device. You can enter the location manually after voice typing."); return; }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        const location = { latitude: coords.latitude, longitude: coords.longitude, accuracy: coords.accuracy, label: `${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)} (GPS · ±${Math.round(coords.accuracy)} m)` };
+        setGpsLocation(location); setLocating(false); setToast("Location added. You can review it before submitting.");
+      },
+      (error) => {
+        setLocating(false);
+        setToast(error.code === 1 ? "Location permission is blocked. Allow location access in your browser settings, or describe your area in the complaint." : "We couldn’t get your GPS location. Try again outdoors or enter your area in the complaint.");
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 },
+    );
+  }
+
+  async function requestFeaturePermissions() {
+    setPermissionPrompt(false);
+    try {
+      if (!navigator.mediaDevices?.getUserMedia) throw new Error("unsupported");
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach((track) => track.stop());
+      setToast("Microphone enabled. Now approve location if your browser asks.");
+    } catch {
+      setToast("Microphone was not enabled. You can allow it later from the voice button or browser site settings.");
+    }
+    getGpsLocation();
   }
 
   if (screen === "home") return (
@@ -111,6 +195,7 @@ export default function Home() {
     <main>
       {toast && <div className="toast" role="status"><span>✓</span>{toast}<button onClick={()=>setToast("")} aria-label="Dismiss">×</button></div>}
       <Header language={language} setLanguage={setLanguage} onHome={()=>setScreen("home")} />
+      {screen === "describe" && permissionPrompt && <div className="permissionOverlay" role="dialog" aria-modal="true" aria-labelledby="permission-title"><div className="permissionDialog"><span className="permissionIcon">◉</span><div><em>OPTIONAL ACCESS</em><h2 id="permission-title">Use voice and your current location?</h2><p>JanSetu can use your microphone to type your complaint and GPS to add accurate location coordinates. Access happens only after you approve the browser prompt.</p><ul><li>🎙 Microphone: only while the listening button is active</li><li>⌖ Location: captured once, then shown for your review</li></ul><small>No audio is saved by this demo. Your exact location is not shown in “nearby complaints.”</small></div><div className="permissionActions"><button className="secondary" onClick={()=>setPermissionPrompt(false)}>Not now</button><button className="primary compact" onClick={requestFeaturePermissions}>Enable microphone & location</button></div></div></div>}
       <section className="pageIntro">
         <div className="eyebrow"><span className="liveDot" /> Citizen grievance service <b>DEMO</b></div>
         <h1>{screen === "describe" ? (hi ? "अपनी समस्या बताइए।" : "Tell us what went wrong.") : screen === "review" ? (hi ? "जमा करने से पहले जाँचें।" : "Check it before you send it.") : screen === "confirm" ? (hi ? "क्या समस्या सच में ठीक हुई?" : "Is this actually fixed?") : screen === "appeal" ? (hi ? "अपील में क्या बताना चाहेंगे?" : "Tell the escalation officer what remains.") : screen === "closed" ? "Thank you for confirming." : (hi ? "हर कदम साफ़ दिखाई देगा।" : "See exactly what’s happening.")}</h1>
@@ -118,7 +203,7 @@ export default function Home() {
       </section>
       <Journey progress={progress} language={language} />
 
-      {screen === "describe" && <Describe t={t} hi={hi} description={description} setDescription={setDescription} loading={loading} prepare={prepareComplaint} startVoice={startVoice} listening={listening} files={files} setFiles={setFiles} fileRef={fileRef} />}
+      {screen === "describe" && <Describe t={t} hi={hi} description={description} setDescription={setDescription} loading={loading} prepare={prepareComplaint} startVoice={startVoice} listening={listening} voiceLanguage={voiceLanguage} setVoiceLanguage={setVoiceLanguage} gpsLocation={gpsLocation} locating={locating} getGpsLocation={getGpsLocation} files={files} setFiles={setFiles} fileRef={fileRef} />}
       {screen === "review" && analysis && <Review analysis={analysis} setAnalysis={setAnalysis} back={()=>setScreen("describe")} submit={submitGrievance} t={t} />}
       {(screen === "track" || screen === "appeal-track") && analysis && <Track analysis={analysis} stage={stage} advance={advanceStage} grievanceId={grievanceId} isAppeal={screen === "appeal-track"} onConfirm={()=>setScreen("confirm")} t={t} />}
       {screen === "confirm" && <Confirm grievanceId={grievanceId} yes={()=>setScreen("closed")} no={()=>setScreen("appeal")} t={t} />}
@@ -131,7 +216,7 @@ export default function Home() {
 function Header({language,setLanguage,onHome}:{language:"en"|"hi";setLanguage:(l:"en"|"hi")=>void;onHome?:()=>void}) { const hi=language==="hi"; return <header className="siteHeader"><button className="brand brandButton" onClick={onHome} aria-label="JanSetu home"><span className="brandMark">ज</span><span>JanSetu <small>जनसेतु</small></span></button><div className="headerRight"><span className="demoChip">DEMO SERVICE</span><button className="languageButton" onClick={()=>setLanguage(hi?"en":"hi")}>अ / A&nbsp;&nbsp; {hi?"English":"हिन्दी"}</button></div></header> }
 function Journey({progress,language}:{progress:number;language:"en"|"hi"}) { const labels=language==="hi"?["समस्या बताएँ","जाँचें","स्थिति देखें","पुष्टि करें"]:["Describe","Review","Track","Confirm"]; return <nav className="journey" aria-label="Grievance journey">{labels.map((label,i)=><span key={label} className={i<=progress?"active":""}><b>{i<progress?"✓":i+1}</b><em>{label}</em>{i<3&&<i />}</span>)}</nav> }
 
-function Describe({t,hi,description,setDescription,loading,prepare,startVoice,listening,files,setFiles,fileRef}:{t:typeof copy.en;hi:boolean;description:string;setDescription:(v:string)=>void;loading:boolean;prepare:()=>void;startVoice:()=>void;listening:boolean;files:string[];setFiles:(v:string[])=>void;fileRef:React.RefObject<HTMLInputElement|null>}) { return <div className="contentGrid"><section className="formCard"><div className="stepLabel">STEP 1 OF 4</div><h2>{t.what}</h2><p className="muted">{t.natural}</p><label htmlFor="issue">{hi?"अपनी समस्या बताएँ":"Describe your problem"}</label><textarea id="issue" value={description} onChange={e=>setDescription(e.target.value)} maxLength={2000} placeholder={t.placeholder}/><div className="textareaMeta"><button className={`voiceButton ${listening?"listening":""}`} onClick={startVoice}>● {listening?(hi?"सुन रहा है...":"Listening..."):(hi?"बोलकर लिखें":"Speak instead")}</button><span>{description.length} / 2,000</span></div><div className="uploadZone" onClick={()=>fileRef.current?.click()}><input ref={fileRef} type="file" multiple accept="image/*,.pdf" onChange={e=>setFiles(Array.from(e.target.files??[]).map(f=>f.name))}/><span>＋</span><div><b>{hi?"फोटो या दस्तावेज़ जोड़ें (वैकल्पिक)":"Add photos or documents (optional)"}</b><p>{files.length?files.join(", "):"Photos, PDF · shown in this demo only"}</p></div></div><div className="tip"><span>i</span><p><b>{hi?"बेहतर शिकायत के लिए":"For a stronger complaint"}</b><br/>{hi?"जगह, तारीख और समस्या कब शुरू हुई, यह बताएँ।":"Include your location, when it started, and how it affects you."}</p></div><button className="primary" disabled={loading} onClick={prepare}>{loading?(hi?"तैयार हो रही है...":"Organising your words..."):t.prepare}<span>{loading?"✦":"→"}</span></button><p className="aiNote">✦ AI organises your words. You review and edit everything before sending.</p><p className="savedNote">✓ {t.saved}</p></section><Nearby hi={hi}/></div> }
+function Describe({t,hi,description,setDescription,loading,prepare,startVoice,listening,voiceLanguage,setVoiceLanguage,gpsLocation,locating,getGpsLocation,files,setFiles,fileRef}:{t:typeof copy.en;hi:boolean;description:string;setDescription:(v:string)=>void;loading:boolean;prepare:()=>void;startVoice:()=>void;listening:boolean;voiceLanguage:string;setVoiceLanguage:(v:string)=>void;gpsLocation:GpsLocation|null;locating:boolean;getGpsLocation:()=>void;files:string[];setFiles:(v:string[])=>void;fileRef:React.RefObject<HTMLInputElement|null>}) { return <div className="contentGrid"><section className="formCard"><div className="stepLabel">STEP 1 OF 4</div><h2>{t.what}</h2><p className="muted">{t.natural}</p><div className="voicePanel"><div className="voicePanelTop"><div><span className={`micOrb ${listening?"active":""}`}>●</span><div><b>{listening?(hi?"सुन रहा है—अब बोलिए":"Listening—speak now"):(hi?"अपनी भाषा में बोलें":"Speak in your language")}</b><small>{listening?"Tap stop when you finish":"Your speech appears in the box below"}</small></div></div><button className={listening?"stopVoice":"startVoice"} onClick={startVoice}>{listening?"■ Stop":"🎙 Start voice"}</button></div><label htmlFor="voice-language">Voice language</label><select id="voice-language" value={voiceLanguage} onChange={e=>setVoiceLanguage(e.target.value)} disabled={listening}>{voiceLanguages.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select><p>Choose any listed language, or “Auto” to use your device language.</p></div><label htmlFor="issue">{hi?"अपनी समस्या बताएँ":"Describe your problem"}</label><textarea id="issue" value={description} onChange={e=>setDescription(e.target.value)} maxLength={2000} placeholder={t.placeholder}/><div className="textareaMeta"><span className={listening?"recordingStatus":""}>● {listening?"Live transcription active":"Voice ready"}</span><span>{description.length} / 2,000</span></div><div className="locationPanel"><span className="locationPin">⌖</span><div><b>{gpsLocation?"Current location added":"Add your current location"}</b><p>{gpsLocation?gpsLocation.label:"Uses GPS once. You review it before submitting."}</p></div><button className="secondary smallButton" onClick={getGpsLocation} disabled={locating}>{locating?"Locating…":gpsLocation?"Refresh GPS":"Use my GPS"}</button></div><div className="uploadZone" onClick={()=>fileRef.current?.click()}><input ref={fileRef} type="file" multiple accept="image/*,.pdf" onChange={e=>setFiles(Array.from(e.target.files??[]).map(f=>f.name))}/><span>＋</span><div><b>{hi?"फोटो या दस्तावेज़ जोड़ें (वैकल्पिक)":"Add photos or documents (optional)"}</b><p>{files.length?files.join(", "):"Photos, PDF · shown in this demo only"}</p></div></div><div className="tip"><span>i</span><p><b>{hi?"बेहतर शिकायत के लिए":"For a stronger complaint"}</b><br/>{hi?"जगह, तारीख और समस्या कब शुरू हुई, यह बताएँ।":"Include your location, when it started, and how it affects you."}</p></div><button className="primary" disabled={loading} onClick={prepare}>{loading?(hi?"तैयार हो रही है...":"Organising your words..."):t.prepare}<span>{loading?"✦":"→"}</span></button><p className="aiNote">✦ AI organises your words. You review and edit everything before sending.</p><p className="savedNote">✓ {t.saved}</p></section><Nearby hi={hi}/></div> }
 function Nearby({hi}:{hi:boolean}) { return <aside><section className="nearbyCard"><div className="cardTop"><span>⌖</span><div><h3>{hi?"आपके आस-पास":"Happening near you"}</h3><p>{hi?"आप अकेले नहीं हैं":"You’re not the only one"}</p></div><b>DEMO DATA</b></div><div className="mapDots"><span/><span/><span/><span/></div><ul><li><span className="category water">Water</span><strong>No water supply for 3 days</strong><small>Shastri Nagar · 0.8 km · 12 similar</small></li><li><span className="category road">Roads</span><strong>Dangerous pothole near school</strong><small>Rajendra Place · 1.2 km · 8 similar</small></li><li><span className="category waste">Waste</span><strong>Garbage not collected this week</strong><small>Karol Bagh · 1.7 km · 6 similar</small></li></ul><p className="privacy">◉ Your exact location is never shown publicly.</p></section><section className="helpCard"><span>☎</span><div><b>{hi?"लिखने में मदद चाहिए?":"Need help filing?"}</b><p>Demo support line: 1800-000-000</p></div></section></aside> }
 function Review({analysis,setAnalysis,back,submit,t}:{analysis:Analysis;setAnalysis:(a:Analysis)=>void;back:()=>void;submit:()=>void;t:typeof copy.en}) { return <section className="singleCard"><div className="reviewBanner"><span>✦</span><div><b>We found the right route</b><p>{analysis.source==="openai"?"Classified by OpenAI · Please confirm":"Demo AI result · Add an API key to use live OpenAI classification"}</p></div><em>AI ASSISTED</em></div><div className="reviewFields"><div><label>Department</label><p>{analysis.department}</p></div><div><label>Category</label><p>{analysis.category}</p></div><div><label>Location</label><input value={analysis.location} onChange={e=>setAnalysis({...analysis,location:e.target.value})}/></div><div><label>Issue type</label><p>{analysis.issueType}</p></div></div><label htmlFor="summary">Your grievance summary</label><textarea id="summary" className="summaryBox" value={analysis.summary} onChange={e=>setAnalysis({...analysis,summary:e.target.value})}/><div className="humanCheck">✓ Nothing is sent until you press “Submit grievance.” Check names, dates and location carefully.</div><div className="buttonRow"><button className="secondary" onClick={back}>← {t.edit}</button><button className="primary compact" onClick={submit}>{t.submit}<span>→</span></button></div></section> }
 function Track({analysis,stage,advance,grievanceId,isAppeal,onConfirm,t}:{analysis:Analysis;stage:number;advance:()=>void;grievanceId:string;isAppeal:boolean;onConfirm:()=>void;t:typeof copy.en}) { const shown=isAppeal?2:stage; return <div className="trackGrid"><section className="timelineCard"><div className="caseHeader"><div><span>{isAppeal?"APPEAL":"GRIEVANCE"} ID</span><h2>{isAppeal?"AP-JS-2026-1047":grievanceId}</h2></div><button onClick={()=>window.print()}>⇩ Save receipt</button></div>{isAppeal&&<div className="escalationBanner"><b>Appeal accepted</b><p>Escalation officer Anil Menon must review this separately from the original decision.</p></div>}<div className="timeline">{stages.map((s,i)=><div className={`timelineItem ${i<shown?"done":i===shown?"current":"future"}`} key={s.title}><span className="timelineDot">{i<shown?"✓":i+1}</span><div><div className="stageLine"><h3>{s.title}</h3>{i<=shown&&<time>{i===0?"28 Aug, 10:47 AM":i===1?"28 Aug, 11:12 AM":i===2?"29 Aug, 9:25 AM":i===3?"30 Aug, 3:40 PM":"31 Aug, 4:15 PM"}</time>}</div><p>{i<=shown?s.detail:"This update has not happened yet."}</p><em>Expected: {s.sla}</em></div></div>)}</div><div className="demoControl"><span>DEMO CONTROL</span><p>Judges can advance the mock case to show the full lifecycle.</p>{shown<4?<button className="primary compact" onClick={advance}>{t.next}<span>→</span></button>:<button className="primary compact" onClick={onConfirm}>Confirm resolution<span>→</span></button>}</div></section><aside className="caseAside"><section className="officerCard"><span>ASSIGNED OFFICER · DEMO DATA</span><div className="officer"><b>PS</b><div><h3>{isAppeal?"Anil Menon":"Priya Sharma"}</h3><p>{isAppeal?"Escalation Officer":"Assistant Engineer"}</p></div></div><p className="contactRule">For privacy, contact stays inside JanSetu.</p></section><section className="caseSummary"><span>YOUR COMPLAINT</span><h3>{analysis.category}</h3><p>{analysis.summary}</p><dl><div><dt>Department</dt><dd>{analysis.department}</dd></div><div><dt>Location</dt><dd>{analysis.location}</dd></div></dl></section><section className="slaCard"><b>◷ SLA promise</b><p>If the deadline is missed, you’ll see an escalation button here automatically.</p></section></aside></div> }
