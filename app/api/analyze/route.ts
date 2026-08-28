@@ -1,3 +1,5 @@
+import { routeGrievance } from "./router";
+
 const schema = {
   type: "object",
   additionalProperties: false,
@@ -9,59 +11,134 @@ const schema = {
     keyDetails: { type: "array", items: { type: "string" } },
     summary: { type: "string" },
   },
-  required: ["department", "category", "location", "issueType", "keyDetails", "summary"],
+  required: [
+    "department",
+    "category",
+    "location",
+    "issueType",
+    "keyDetails",
+    "summary",
+  ],
 };
 
-function demoAnalysis(text: string) {
-  const lower = text.toLowerCase();
-  const isWater = /water|paani|पानी|supply|pipeline/.test(lower);
-  const isRoad = /road|pothole|street|सड़क/.test(lower);
-  const isWaste = /garbage|waste|कचरा|rubbish/.test(lower);
-  const category = isWater ? "Water supply" : isRoad ? "Roads & safety" : isWaste ? "Waste collection" : "Civic services";
-  const department = isWater ? "Delhi Jal Board" : isRoad ? "Public Works Department" : isWaste ? "Municipal Corporation" : "District Public Grievance Office";
-  const location = text.match(/(?:in|at|near|from)\s+([A-Z][\w ]{2,30})/i)?.[1]?.trim() || "Location to confirm";
+type ComplaintDetails = {
+  district?: string;
+  blockTehsil?: string;
+  gramPanchayat?: string;
+  locality?: string;
+  startedOn?: string;
+  frequency?: string;
+  affectedPeople?: string;
+  urgency?: string;
+  requestedResolution?: string;
+};
+
+function fallbackAnalysis(
+  text: string,
+  selectedState?: string,
+  details: ComplaintDetails = {},
+) {
+  const route = routeGrievance(text, selectedState);
+  const extracted = text
+    .match(/(?:in|at|near|from)\s+([A-Z][\w ]{2,40})/i)?.[1]
+    ?.trim();
+  const location =
+    [extracted, route.state]
+      .filter(Boolean)
+      .filter((value, index, all) => all.indexOf(value) === index)
+      .join(", ") || "Location to confirm";
   return {
-    department,
-    category,
+    department: route.department,
+    category: route.category,
     location,
-    issueType: category,
-    keyDetails: ["Citizen-reported service disruption", "Location and duration should be verified"],
+    issueType: route.issueType,
+    keyDetails: [
+      "Citizen-reported service issue",
+      route.state
+        ? `State/UT identified: ${route.state}`
+        : "State/UT must be confirmed",
+      details.district ? `District: ${details.district}` : "District to confirm",
+      details.locality ? `Village/ward: ${details.locality}` : "Village/ward to confirm",
+      details.urgency ? `Urgency: ${details.urgency}` : "Urgency to confirm",
+    ],
     summary: text.trim().replace(/\s+/g, " "),
   };
 }
 
 export async function POST(request: Request) {
   const cookie = request.headers.get("cookie") || "";
-  if (!cookie.includes("jansetu_human=1") || !cookie.includes("jansetu_digilocker=")) {
-    return Response.json({ error: "Identity and CAPTCHA verification are required." }, { status: 403 });
+  if (
+    !cookie.includes("jansetu_human=1") ||
+    !cookie.includes("jansetu_digilocker=")
+  ) {
+    return Response.json(
+      { error: "Identity and CAPTCHA verification are required." },
+      { status: 403 },
+    );
   }
-  const { description } = (await request.json()) as { description?: string };
+  const { description, state, details } = (await request.json()) as {
+    description?: string;
+    state?: string;
+    details?: ComplaintDetails;
+  };
   if (!description || description.trim().length < 10) {
-    return Response.json({ error: "Please add a little more detail." }, { status: 400 });
+    return Response.json(
+      { error: "Please add a little more detail." },
+      { status: 400 },
+    );
   }
 
   const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return Response.json({ ...demoAnalysis(description), source: "demo" });
+  if (!apiKey)
+    return Response.json({
+      ...fallbackAnalysis(description, state, details),
+      source: "rules",
+    });
 
   try {
     const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
       body: JSON.stringify({
         model: "gpt-5-mini",
         store: false,
-        instructions: "You route Indian public grievances. Extract only information present in the citizen text. Use plain, neutral language. Never invent personal details. Draft a concise first-person grievance summary for citizen review.",
-        input: description,
-        text: { format: { type: "json_schema", name: "grievance_analysis", strict: true, schema } },
+        instructions:
+          "You route Indian public grievances. Respect Indian federal jurisdiction: state and local service issues must go to the concerned State/UT authority, while central services go to the appropriate Government of India ministry. Never route to a Delhi-specific body unless the location is Delhi. Extract only information present in the citizen text. Use plain, neutral language. Draft a concise first-person grievance summary for citizen review.",
+        input: `Citizen-selected State/UT: ${state || "Not selected"}\nStructured complaint fields: ${JSON.stringify(details || {})}\nComplaint: ${description}`,
+        text: {
+          format: {
+            type: "json_schema",
+            name: "grievance_analysis",
+            strict: true,
+            schema,
+          },
+        },
       }),
     });
-    if (!response.ok) throw new Error(`OpenAI request failed: ${response.status}`);
-    const result = await response.json() as { output?: Array<{ type: string; content?: Array<{ type: string; text?: string }> }> };
-    const outputText = result.output?.flatMap((item) => item.content ?? []).find((item) => item.type === "output_text")?.text;
+    if (!response.ok)
+      throw new Error(`OpenAI request failed: ${response.status}`);
+    const result = (await response.json()) as {
+      output?: Array<{
+        type: string;
+        content?: Array<{ type: string; text?: string }>;
+      }>;
+    };
+    const outputText = result.output
+      ?.flatMap((item) => item.content ?? [])
+      .find((item) => item.type === "output_text")?.text;
     if (!outputText) throw new Error("No structured output returned");
     return Response.json({ ...JSON.parse(outputText), source: "openai" });
   } catch (error) {
-    console.error("AI classification unavailable; returning demo analysis", error);
-    return Response.json({ ...demoAnalysis(description), source: "demo-fallback" });
+    console.error(
+      "AI classification unavailable; returning rules-based analysis",
+      error,
+    );
+    return Response.json({
+      ...fallbackAnalysis(description, state, details),
+      source: "rules-fallback",
+    });
   }
 }
