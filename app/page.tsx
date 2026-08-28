@@ -39,6 +39,15 @@ type ComplaintDetails = {
   urgency: string;
   requestedResolution: string;
 };
+type TrackingRecord = {
+  issueNumber: string;
+  department: string;
+  category: string;
+  location: string;
+  status: string;
+  stage: number;
+  createdAt: string;
+};
 type SpeechResultEvent = {
   resultIndex: number;
   results: ArrayLike<{ isFinal: boolean; 0: { transcript: string } }>;
@@ -204,7 +213,7 @@ const copy = {
 export default function Home() {
   const [screen, setScreen] = useState<Screen>("home");
   const [language, setLanguage] = useState<"en" | "hi">("en");
-  const [name, setName] = useState("Asha Verma");
+  const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [loading, setLoading] = useState(false);
@@ -234,6 +243,14 @@ export default function Home() {
   const [captchaToken, setCaptchaToken] = useState("");
   const [captchaMode, setCaptchaMode] = useState<"demo" | "live">("demo");
   const [securityLoading, setSecurityLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [grievanceId, setGrievanceId] = useState("");
+  const [showTrackingLookup, setShowTrackingLookup] = useState(false);
+  const [trackingIssue, setTrackingIssue] = useState("");
+  const [trackingName, setTrackingName] = useState("");
+  const [trackingError, setTrackingError] = useState("");
+  const [trackingLoading, setTrackingLoading] = useState(false);
+  const [trackingReadOnly, setTrackingReadOnly] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const continueListeningRef = useRef(false);
@@ -241,7 +258,6 @@ export default function Home() {
   const voiceFinalRef = useRef("");
   const t = copy[language];
   const hi = language === "hi";
-  const grievanceId = "JS-2026-0828-1047";
 
   useEffect(() => {
     const draft = localStorage.getItem("jansetu-draft");
@@ -337,15 +353,85 @@ export default function Home() {
     }
   }
 
-  function submitGrievance() {
-    localStorage.removeItem("jansetu-draft");
-    setStage(0);
-    setScreen("track");
-    setToast(
-      hi
-        ? "शिकायत सफलतापूर्वक दर्ज हुई।"
-        : "Grievance filed. A receipt is ready for you.",
-    );
+  async function submitGrievance() {
+    if (!analysis) return;
+    if (name.trim().length < 2) {
+      setToast("Enter the complaint filer’s name before submitting.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const response = await fetch("/api/complaints", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          filerName: name,
+          department: analysis.department,
+          category: analysis.category,
+          location: analysis.location,
+        }),
+      });
+      const result = (await response.json()) as {
+        complaint?: { issueNumber: string };
+        error?: string;
+      };
+      if (!response.ok || !result.complaint) {
+        throw new Error(result.error || "Could not file complaint");
+      }
+      localStorage.removeItem("jansetu-draft");
+      setGrievanceId(result.complaint.issueNumber);
+      setTrackingReadOnly(false);
+      setStage(0);
+      setScreen("track");
+      setToast(
+        hi
+          ? `शिकायत दर्ज हुई। आपका नंबर ${result.complaint.issueNumber} है।`
+          : `Grievance filed. Save your issue number: ${result.complaint.issueNumber}`,
+      );
+    } catch (error) {
+      setToast(
+        error instanceof Error
+          ? error.message
+          : "The complaint could not be filed. Please try again.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function trackComplaint() {
+    setTrackingError("");
+    setTrackingLoading(true);
+    try {
+      const response = await fetch(
+        `/api/complaints?issue=${encodeURIComponent(trackingIssue)}&name=${encodeURIComponent(trackingName)}`,
+      );
+      const result = (await response.json()) as {
+        complaint?: TrackingRecord;
+        error?: string;
+      };
+      if (!response.ok || !result.complaint)
+        throw new Error(result.error || "Complaint not found.");
+      const record = result.complaint;
+      setGrievanceId(record.issueNumber);
+      setTrackingReadOnly(true);
+      setStage(Math.max(0, Math.min(4, record.stage)));
+      setAnalysis({
+        department: record.department,
+        category: record.category,
+        location: record.location,
+        issueType: record.category,
+        keyDetails: [`Filed on ${record.createdAt}`, `Current status: ${record.status}`],
+        summary: `${record.category} complaint filed for ${record.location}.`,
+        source: "tracking",
+      });
+      setShowTrackingLookup(false);
+      setScreen("track");
+    } catch (error) {
+      setTrackingError(error instanceof Error ? error.message : "Complaint not found.");
+    } finally {
+      setTrackingLoading(false);
+    }
   }
 
   function advanceStage() {
@@ -578,19 +664,7 @@ export default function Home() {
               </button>
               <button
                 className="secondary"
-                onClick={() => {
-                  setAnalysis({
-                    department: "Delhi Jal Board",
-                    category: "Water supply",
-                    location: "Shastri Nagar",
-                    issueType: "Water supply disruption",
-                    keyDetails: [],
-                    summary: "No water supply for three days in Shastri Nagar.",
-                    source: "sample",
-                  });
-                  setStage(2);
-                  setScreen("track");
-                }}
+                onClick={() => setShowTrackingLookup(true)}
               >
                 {t.existing}
               </button>
@@ -640,12 +714,22 @@ export default function Home() {
         </section>
         <section className="loginStrip">
           <div>
-            <span className="avatar">AV</span>
-            <label htmlFor="demoName">Citizen profile</label>
+            <span className="avatar">
+              {name.trim()
+                ? name
+                    .trim()
+                    .split(/\s+/)
+                    .slice(0, 2)
+                    .map((part) => part[0]?.toUpperCase())
+                    .join("")
+                : "नाम"}
+            </span>
+            <label htmlFor="filerName">Complaint filer’s name</label>
             <input
-              id="demoName"
+              id="filerName"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              placeholder="पूरा नाम / Full name"
             />
           </div>
           <p>🔒 This prototype uses no real personal or government data.</p>
@@ -660,6 +744,21 @@ export default function Home() {
             loading={securityLoading}
             close={() => setShowSecurityGate(false)}
             complete={completeSecurityCheck}
+          />
+        )}
+        {showTrackingLookup && (
+          <TrackingLookup
+            issue={trackingIssue}
+            setIssue={setTrackingIssue}
+            name={trackingName}
+            setName={setTrackingName}
+            loading={trackingLoading}
+            error={trackingError}
+            close={() => {
+              setShowTrackingLookup(false);
+              setTrackingError("");
+            }}
+            submit={trackComplaint}
           />
         )}
       </main>
@@ -805,6 +904,7 @@ export default function Home() {
           submit={submitGrievance}
           t={t}
           details={details}
+          submitting={submitting}
         />
       )}
       {(screen === "track" || screen === "appeal-track") && analysis && (
@@ -816,6 +916,7 @@ export default function Home() {
           isAppeal={screen === "appeal-track"}
           onConfirm={() => setScreen("confirm")}
           t={t}
+          readOnly={trackingReadOnly}
         />
       )}
       {screen === "confirm" && (
@@ -848,6 +949,67 @@ export default function Home() {
         <Closed grievanceId={grievanceId} home={() => setScreen("home")} />
       )}
     </main>
+  );
+}
+
+function TrackingLookup({
+  issue,
+  setIssue,
+  name,
+  setName,
+  loading,
+  error,
+  close,
+  submit,
+}: {
+  issue: string;
+  setIssue: (value: string) => void;
+  name: string;
+  setName: (value: string) => void;
+  loading: boolean;
+  error: string;
+  close: () => void;
+  submit: () => void;
+}) {
+  return (
+    <div className="trackingOverlay" role="dialog" aria-modal="true" aria-labelledby="tracking-title">
+      <section className="trackingLookup">
+        <button className="gateClose" onClick={close} aria-label="Close tracking lookup">×</button>
+        <span className="trackingIcon">#</span>
+        <p className="trackingKicker">शिकायत की स्थिति · TRACK COMPLAINT</p>
+        <h2 id="tracking-title">Enter your issue number</h2>
+        <p className="trackingIntro">
+          Anyone helping the filer can check the status using the issue number and the filer’s exact name.
+        </p>
+        <label htmlFor="trackingIssue">Issue number / शिकायत संख्या</label>
+        <input
+          id="trackingIssue"
+          value={issue}
+          onChange={(event) => setIssue(event.target.value.toUpperCase())}
+          placeholder="JS-2026-ABCDE-12345"
+          autoComplete="off"
+        />
+        <label htmlFor="trackingName">Filer’s full name / शिकायतकर्ता का नाम</label>
+        <input
+          id="trackingName"
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          placeholder="Use the same name entered while filing"
+          autoComplete="name"
+        />
+        {error && <p className="trackingError" role="alert">{error}</p>}
+        <button
+          className="primary"
+          disabled={loading || issue.trim().length < 10 || name.trim().length < 2}
+          onClick={submit}
+        >
+          {loading ? "Checking…" : "Track complaint / स्थिति देखें"}<span>→</span>
+        </button>
+        <small className="trackingPrivacy">
+          For privacy, tracking shows status and routing only. Complaint text and evidence are not displayed.
+        </small>
+      </section>
+    </div>
   );
 }
 
@@ -1441,6 +1603,7 @@ function Review({
   submit,
   t,
   details,
+  submitting,
 }: {
   analysis: Analysis;
   setAnalysis: (a: Analysis) => void;
@@ -1448,6 +1611,7 @@ function Review({
   submit: () => void;
   t: typeof copy.en;
   details: ComplaintDetails;
+  submitting: boolean;
 }) {
   return (
     <section className="singleCard">
@@ -1511,12 +1675,16 @@ function Review({
         ✓ Nothing is sent until you press “Submit grievance.” Check names, dates
         and location carefully.
       </div>
+      <div className="issueNumberPromise">
+        <b># A unique issue number will be created</b>
+        <p>Save it with the filer’s name to track this complaint from any device.</p>
+      </div>
       <div className="buttonRow">
         <button className="secondary" onClick={back}>
           ← {t.edit}
         </button>
-        <button className="primary compact" onClick={submit}>
-          {t.submit}
+        <button className="primary compact" onClick={submit} disabled={submitting}>
+          {submitting ? "Generating issue number…" : t.submit}
           <span>→</span>
         </button>
       </div>
@@ -1531,6 +1699,7 @@ function Track({
   isAppeal,
   onConfirm,
   t,
+  readOnly,
 }: {
   analysis: Analysis;
   stage: number;
@@ -1539,6 +1708,7 @@ function Track({
   isAppeal: boolean;
   onConfirm: () => void;
   t: typeof copy.en;
+  readOnly: boolean;
 }) {
   const shown = isAppeal ? 2 : stage;
   return (
@@ -1592,7 +1762,7 @@ function Track({
             </div>
           ))}
         </div>
-        <div className="demoControl">
+        {!readOnly && <div className="demoControl">
           <span>LIFECYCLE PREVIEW</span>
           <p>Advance this sample case to see the full grievance journey.</p>
           {shown < 4 ? (
@@ -1605,7 +1775,13 @@ function Track({
               Confirm resolution<span>→</span>
             </button>
           )}
-        </div>
+        </div>}
+        {readOnly && (
+          <div className="trackingNotice">
+            <b>✓ Verified tracking result</b>
+            <p>This is a read-only status view. Only authorised grievance staff can update the complaint.</p>
+          </div>
+        )}
       </section>
       <aside className="caseAside">
         <section className="officerCard">
