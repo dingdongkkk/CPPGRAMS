@@ -106,6 +106,8 @@ type ComplaintDetails = {
   affectedPeople: string;
   requestedResolution: string;
 };
+type ComplaintLocationMatch = "same" | "different" | "";
+type FilingMode = "ai" | "manual" | null;
 type TrackingRecord = {
   issueNumber: string;
   department: string;
@@ -238,6 +240,8 @@ export default function Home() {
   const [gpsLocation, setGpsLocation] = useState<GpsLocation | null>(null);
   const [locating, setLocating] = useState(false);
   const [selectedState, setSelectedState] = useState("");
+  const [complaintLocationMatch, setComplaintLocationMatch] =
+    useState<ComplaintLocationMatch>("");
   const [details, setDetails] = useState<ComplaintDetails>({
     district: "",
     blockTehsil: "",
@@ -334,6 +338,14 @@ export default function Home() {
       setToast(t.tMoreDetail);
       return;
     }
+    if (!complaintLocationMatch) {
+      setToast(t.tChooseComplaintLocation);
+      return;
+    }
+    if (complaintLocationMatch === "same" && !gpsLocation) {
+      setToast(t.tAddCurrentLocationFirst);
+      return;
+    }
     if (!selectedState && !gpsLocation?.state) {
       setToast(t.tSelectState);
       return;
@@ -378,6 +390,16 @@ export default function Home() {
       setToast(t.tPrepareFail);
     } finally {
       setLoading(false);
+    }
+  }
+
+  function chooseComplaintLocation(next: Exclude<ComplaintLocationMatch, "">) {
+    setComplaintLocationMatch(next);
+    if (next === "different") {
+      setPermissionPrompt(false);
+      setGpsLocation(null);
+    } else {
+      setPermissionPrompt(true);
     }
   }
 
@@ -931,7 +953,7 @@ export default function Home() {
           close={() => setShowPicker(false)}
         />
       )}
-      {screen === "describe" && permissionPrompt && (
+      {screen === "describe" && permissionPrompt && complaintLocationMatch === "same" && (
         <div
           className="permissionOverlay"
           role="dialog"
@@ -1021,6 +1043,8 @@ export default function Home() {
           files={files}
           setFiles={setFiles}
           fileRef={fileRef}
+          complaintLocationMatch={complaintLocationMatch}
+          chooseComplaintLocation={chooseComplaintLocation}
         />
       )}
       {screen === "review" && analysis && (
@@ -1804,6 +1828,8 @@ function Describe({
   files,
   setFiles,
   fileRef,
+  complaintLocationMatch,
+  chooseComplaintLocation,
 }: {
   t: Dict;
   description: string;
@@ -1824,13 +1850,132 @@ function Describe({
   files: string[];
   setFiles: (v: string[]) => void;
   fileRef: React.RefObject<HTMLInputElement | null>;
+  complaintLocationMatch: ComplaintLocationMatch;
+  chooseComplaintLocation: (v: Exclude<ComplaintLocationMatch, "">) => void;
 }) {
+  const [filingMode, setFilingMode] = useState<FilingMode>(null);
+  const [aiStep, setAiStep] = useState(0);
+  const [aiAnswer, setAiAnswer] = useState("");
+  const [aiHistory, setAiHistory] = useState<Array<{ question: string; answer: string }>>([]);
+
+  const aiQuestions = [
+    { id: "description", prompt: t.aiChatQProblem, type: "textarea" },
+    ...(complaintLocationMatch === "different"
+      ? [
+          { id: "state", prompt: t.aiChatQState, type: "state" },
+          { id: "district", prompt: t.aiChatQDistrict, type: "text" },
+          { id: "blockTehsil", prompt: t.aiChatQBlock, type: "text" },
+          { id: "gramPanchayat", prompt: t.aiChatQPanchayat, type: "text" },
+          { id: "locality", prompt: t.aiChatQLocality, type: "text" },
+        ]
+      : []),
+    { id: "startedOn", prompt: t.aiChatQStarted, type: "date" },
+    { id: "frequency", prompt: t.aiChatQFrequency, type: "frequency" },
+    { id: "affectedPeople", prompt: t.aiChatQAffected, type: "text" },
+    { id: "requestedResolution", prompt: t.aiChatQOutcome, type: "text" },
+  ];
+  const activeQuestion = aiQuestions[Math.min(aiStep, aiQuestions.length - 1)];
+  const aiComplete = aiStep >= aiQuestions.length;
+
+  function savedAnswer(id: string) {
+    if (id === "description") return description;
+    if (id === "state") return selectedState;
+    return details[id as keyof ComplaintDetails] || "";
+  }
+
+  function selectMode(mode: Exclude<FilingMode, null>) {
+    setFilingMode(mode);
+    setAiStep(0);
+    setAiHistory([]);
+    setAiAnswer(mode === "ai" ? savedAnswer(aiQuestions[0].id) : "");
+  }
+
+  function saveConversationalAnswer() {
+    const answer = aiAnswer.trim();
+    if (!answer || !activeQuestion) return;
+    if (activeQuestion.id === "description") setDescription(answer);
+    else if (activeQuestion.id === "state") setSelectedState(answer);
+    else setDetails({ ...details, [activeQuestion.id]: answer });
+    setAiHistory((items) => [...items, { question: activeQuestion.prompt, answer }]);
+    const next = aiStep + 1;
+    setAiStep(next);
+    setAiAnswer(next < aiQuestions.length ? savedAnswer(aiQuestions[next].id) : "");
+  }
+
   return (
     <div className="contentGrid">
       <section className="formCard">
         <div className="stepLabel">{t.stepLabel}</div>
         <h2>{t.what}</h2>
         <p className="muted">{t.natural}</p>
+        <div className="filingModeChooser" role="group" aria-label={t.modeTitle}>
+          <div className="sectionHeading">
+            <div><b>{t.modeTitle}</b><p>{t.modeBody}</p></div>
+            <span>{t.modeBadge}</span>
+          </div>
+          <div className="filingModeCards">
+            <button className={filingMode === "ai" ? "selected" : ""} onClick={() => selectMode("ai")}>
+              <span><IconSpark size={20} /></span><b>{t.modeAiTitle}</b><p>{t.modeAiBody}</p><em>{t.modeAiCta}</em>
+            </button>
+            <button className={filingMode === "manual" ? "selected" : ""} onClick={() => selectMode("manual")}>
+              <span><IconGrid size={20} /></span><b>{t.modeManualTitle}</b><p>{t.modeManualBody}</p><em>{t.modeManualCta}</em>
+            </button>
+          </div>
+        </div>
+
+        {filingMode && (
+          <div className="locationMatchCard">
+            <span className="locationPin"><IconPin size={18} /></span>
+            <div><b>{t.locationMatchTitle}</b><p>{t.locationMatchBody}</p></div>
+            <div className="locationMatchActions">
+              <button className={complaintLocationMatch === "same" ? "selected" : ""} onClick={() => chooseComplaintLocation("same")}>{t.locationMatchYes}</button>
+              <button className={complaintLocationMatch === "different" ? "selected" : ""} onClick={() => chooseComplaintLocation("different")}>{t.locationMatchNo}</button>
+            </div>
+          </div>
+        )}
+
+        {filingMode && complaintLocationMatch && filingMode === "ai" && (
+          <div className="aiConversation" aria-live="polite">
+            <div className="aiConversationHeader">
+              <span><IconSpark size={17} /></span>
+              <div><b>{t.aiChatTitle}</b><small>{t.aiChatBody}</small></div>
+              <em>{Math.min(aiStep + 1, aiQuestions.length)} / {aiQuestions.length}</em>
+            </div>
+            <div className="aiChatHistory">
+              {aiHistory.map((item, index) => (
+                <div className="aiChatExchange" key={`${item.question}-${index}`}>
+                  <p>{item.question}</p><div>{item.answer}</div>
+                </div>
+              ))}
+            </div>
+            {!aiComplete ? (
+              <div className="aiChatCurrent">
+                <p><span>AI</span>{activeQuestion.prompt}</p>
+                {activeQuestion.type === "textarea" ? (
+                  <textarea value={aiAnswer} onChange={(e) => setAiAnswer(e.target.value)} placeholder={t.aiChatAnswerPlaceholder} />
+                ) : activeQuestion.type === "state" ? (
+                  <select value={aiAnswer} onChange={(e) => setAiAnswer(e.target.value)}>
+                    <option value="">{t.selectState}</option>
+                    {statesAndUTs.map((state) => <option key={state} value={state}>{state}</option>)}
+                  </select>
+                ) : activeQuestion.type === "frequency" ? (
+                  <select value={aiAnswer} onChange={(e) => setAiAnswer(e.target.value)}>
+                    <option value="">{t.aiChatChoose}</option>
+                    <option value="Ongoing">{t.freqOngoing}</option><option value="Every day">{t.freqDaily}</option>
+                    <option value="Intermittent">{t.freqIntermittent}</option><option value="One-time incident">{t.freqOneTime}</option>
+                  </select>
+                ) : (
+                  <input type={activeQuestion.type} value={aiAnswer} onChange={(e) => setAiAnswer(e.target.value)} placeholder={t.aiChatAnswerPlaceholder} />
+                )}
+                <button className="primary compact" disabled={!aiAnswer.trim()} onClick={saveConversationalAnswer}>{t.aiChatNext}<IconArrowRight size={15} /></button>
+              </div>
+            ) : (
+              <div className="aiChatComplete"><IconCheck size={22} /><div><b>{t.aiChatCompleteTitle}</b><p>{t.aiChatCompleteBody}</p></div></div>
+            )}
+          </div>
+        )}
+
+        {filingMode && complaintLocationMatch && filingMode === "manual" && <>
         <div className="voicePanel">
           <div className="voicePanelTop">
             <div>
@@ -1987,6 +2132,9 @@ function Describe({
               : t.aiQVillage}
           </p>
         </div>
+        </>}
+        {filingMode && complaintLocationMatch && <>
+        {complaintLocationMatch === "same" && (
         <div className="locationPanel">
           <span className="locationPin"><IconPin size={18} /></span>
           <div>
@@ -2006,6 +2154,7 @@ function Describe({
             {locating ? t.locating : gpsLocation ? t.locRefresh : t.locUse}
           </button>
         </div>
+        )}
         <button
           type="button"
           className="uploadZone"
@@ -2041,6 +2190,7 @@ function Describe({
         </button>
         <p className="aiNote"><IconSpark size={14} />{t.aiNote}</p>
         <p className="savedNote">✓ {t.saved}</p>
+        </>}
       </section>
       <Nearby t={t} state={selectedState} />
     </div>
