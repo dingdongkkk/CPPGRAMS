@@ -32,6 +32,23 @@ type PortalPanel =
   | "mobile"
   | "signin"
   | null;
+type DashboardUpdate = {
+  title: string;
+  detail: string;
+  date: string;
+  done: boolean;
+  icon: string;
+};
+type DashboardComplaint = {
+  id: string;
+  subject: string;
+  department: string;
+  location: string;
+  status: string;
+  statusTone: "green" | "amber" | "blue";
+  filedOn: string;
+  updates: DashboardUpdate[];
+};
 type Analysis = {
   department: string;
   category: string;
@@ -169,6 +186,59 @@ function urgencyLabel(t: Dict, urgency: Analysis["urgency"]) {
         : t.urgencyLow;
 }
 
+function createDemoJourney(subject: string, department: string, location: string, seed = Date.now()): DashboardUpdate[] {
+  const text = `${subject} ${department}`.toLowerCase();
+  const water = text.includes("water") || text.includes("irrigation") || text.includes("drain");
+  const roads = text.includes("road") || text.includes("pothole") || text.includes("bridge");
+  const power = text.includes("power") || text.includes("electric");
+  const action = water
+    ? `A field crew has been assigned to inspect the supply line near ${location}.`
+    : roads
+      ? `The junior engineer has marked the location for a site inspection near ${location}.`
+      : power
+        ? `The local maintenance team has been asked to inspect the feeder serving ${location}.`
+        : `The concerned field officer has scheduled a verification visit near ${location}.`;
+  const work = water
+    ? "Labourers and a pump team have been sent to clear the blockage and restore flow."
+    : roads
+      ? "Repair workers have been sent with material to make the location safe."
+      : power
+        ? "A maintenance crew has been sent to check the line and replace the damaged part."
+        : "The department has sent a field team to carry out the reported corrective action.";
+  const day = (offset: number) => new Date(seed - offset * 86400000).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+  return [
+    { title: "Complaint received", detail: "Your complaint was registered and a unique case number was created.", date: day(0), done: true, icon: "✓" },
+    { title: "Reached the right department", detail: `${department} has accepted the case for ${location}.`, date: day(0), done: true, icon: "↗" },
+    { title: "Officer assigned", detail: "The grievance officer responsible for coordinating this issue has been assigned.", date: day(1), done: true, icon: "◎" },
+    { title: "Action team on the ground", detail: action, date: day(2), done: true, icon: "⌖" },
+    { title: "Repair work started", detail: work, date: day(3), done: false, icon: "⚒" },
+    { title: "You confirm the result", detail: "When the department reports completion, you decide whether the issue is actually fixed.", date: "Next step", done: false, icon: "?" },
+  ];
+}
+
+const initialDashboardComplaints: DashboardComplaint[] = [
+  {
+    id: "JS-2026-WTR-1842",
+    subject: "No water supply in Ward 6",
+    department: "Water Resources Department, Bihar",
+    location: "Gaya, Bihar",
+    status: "Action team on the ground",
+    statusTone: "blue",
+    filedOn: "28 Aug 2026",
+    updates: createDemoJourney("No water supply", "Water Resources Department, Bihar", "Gaya, Bihar", new Date("2026-08-31T10:00:00").getTime()),
+  },
+  {
+    id: "JS-2026-ROAD-0931",
+    subject: "Pothole near the primary school",
+    department: "Rural Works Department, Bihar",
+    location: "Nalanda, Bihar",
+    status: "Officer assigned",
+    statusTone: "amber",
+    filedOn: "26 Aug 2026",
+    updates: createDemoJourney("Pothole near the primary school", "Rural Works Department, Bihar", "Nalanda, Bihar", new Date("2026-08-29T10:00:00").getTime()).map((item, i) => ({ ...item, done: i < 3 })),
+  },
+];
+
 export default function Home() {
   const [screen, setScreen] = useState<Screen>("home");
   const [language, setLanguage] = useState<LangCode>("en");
@@ -218,6 +288,8 @@ export default function Home() {
   const [resolutionFeedback, setResolutionFeedback] = useState<"resolved" | "not-resolved" | "">("");
   const [processRating, setProcessRating] = useState(0);
   const [portalPanel, setPortalPanel] = useState<PortalPanel>(null);
+  const [dashboardComplaints, setDashboardComplaints] = useState<DashboardComplaint[]>(initialDashboardComplaints);
+  const [selectedDashboardId, setSelectedDashboardId] = useState(initialDashboardComplaints[0].id);
   const fileRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const continueListeningRef = useRef(false);
@@ -355,6 +427,18 @@ export default function Home() {
       }
       localStorage.removeItem("jansetu-draft");
       setGrievanceId(result.complaint.issueNumber);
+      const dashboardCase: DashboardComplaint = {
+        id: result.complaint.issueNumber,
+        subject: analysis.category,
+        department: analysis.department,
+        location: analysis.location,
+        status: "Complaint received",
+        statusTone: "green",
+        filedOn: new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
+        updates: createDemoJourney(analysis.category, analysis.department, analysis.location),
+      };
+      setDashboardComplaints((items) => [dashboardCase, ...items]);
+      setSelectedDashboardId(dashboardCase.id);
       setTrackingReadOnly(false);
       setStage(1);
       setScreen("track");
@@ -634,6 +718,7 @@ export default function Home() {
           language={language}
           openPicker={() => setShowPicker(true)}
           openPanel={setPortalPanel}
+          openDashboard={() => setScreen("dashboard")}
         />
         <nav className="portalNav" aria-label={t.portalNavLabel}>
           <button onClick={() => setPortalPanel("about")}>{t.portalAbout}</button>
@@ -780,6 +865,27 @@ export default function Home() {
       </main>
     );
 
+  if (screen === "dashboard")
+    return (
+      <main className="dashboardPage">
+        <Header
+          language={language}
+          openPicker={() => setShowPicker(true)}
+          onHome={() => setScreen("home")}
+          openDashboard={() => setScreen("dashboard")}
+        />
+        {showPicker && <LanguagePicker active={language} onChoose={chooseLanguage} close={() => setShowPicker(false)} />}
+        <Dashboard
+          t={t}
+          complaints={dashboardComplaints}
+          selectedId={selectedDashboardId}
+          selectComplaint={setSelectedDashboardId}
+          createJourney={(id) => setDashboardComplaints((items) => items.map((item) => item.id === id ? { ...item, updates: createDemoJourney(item.subject, item.department, item.location), status: "Action team on the ground", statusTone: "blue" } : item))}
+          backHome={() => setScreen("home")}
+        />
+      </main>
+    );
+
   return (
     <main>
       {toast && (
@@ -795,6 +901,7 @@ export default function Home() {
         language={language}
         openPicker={() => setShowPicker(true)}
         onHome={() => setScreen("home")}
+        openDashboard={() => setScreen("dashboard")}
       />
       {showPicker && (
         <LanguagePicker
@@ -1258,11 +1365,13 @@ function Header({
   openPicker,
   onHome,
   openPanel,
+  openDashboard,
 }: {
   language: LangCode;
   openPicker: () => void;
   onHome?: () => void;
   openPanel?: (panel: Exclude<PortalPanel, null>) => void;
+  openDashboard?: () => void;
 }) {
   const t = getDict(language);
   const meta = getLanguage(language);
@@ -1279,6 +1388,7 @@ function Header({
         </span>
       </button>
       <div className="headerRight">
+        {openDashboard && <button className="dashboardButton" onClick={openDashboard}>▦ {t.dashboardLabel}</button>}
         {openPanel && (
           <button className="headerInfo" onClick={() => openPanel("contact")}>
             {t.portalContact}
@@ -1295,6 +1405,67 @@ function Header({
         </button>
       </div>
     </header>
+  );
+}
+
+function Dashboard({
+  t,
+  complaints,
+  selectedId,
+  selectComplaint,
+  createJourney,
+  backHome,
+}: {
+  t: Dict;
+  complaints: DashboardComplaint[];
+  selectedId: string;
+  selectComplaint: (id: string) => void;
+  createJourney: (id: string) => void;
+  backHome: () => void;
+}) {
+  const selected = complaints.find((item) => item.id === selectedId) || complaints[0];
+  return (
+    <>
+      <section className="dashboardHero">
+        <div>
+          <button className="dashboardBack" onClick={backHome}>← {t.returnHome}</button>
+          <p className="dashboardKicker">{t.dashboardKicker}</p>
+          <h1>{t.dashboardTitle}</h1>
+          <p>{t.dashboardBody}</p>
+        </div>
+        <div className="ministryBadge">
+          <img src="https://pgportal.gov.in/Images/iconHome/logo.png" alt="CPGRAMS logo" />
+          <div><b>{t.ministryName}</b><span>{t.ministrySub}</span></div>
+        </div>
+      </section>
+      <main className="dashboardLayout">
+        <aside className="complaintListCard">
+          <div className="dashboardCardHeader"><div><span>{t.dashboardCasesKicker}</span><h2>{t.dashboardCasesTitle}</h2></div><b>{complaints.length}</b></div>
+          <div className="complaintList">
+            {complaints.map((item) => (
+              <button key={item.id} className={`complaintListItem ${item.id === selected.id ? "selected" : ""}`} onClick={() => selectComplaint(item.id)}>
+                <span className={`statusDot ${item.statusTone}`} />
+                <div><b>{item.subject}</b><small>{item.department}</small><em>{item.id} · {item.status}</em></div><i>›</i>
+              </button>
+            ))}
+          </div>
+          <button className="primary compact dashboardFileButton" onClick={backHome}>{t.dashboardFileNew}<span>→</span></button>
+        </aside>
+        <section className="dashboardDetail">
+          <div className="detailTopline"><div><span>{t.dashboardTrackingKicker}</span><h2>{selected.subject}</h2><p>{selected.department} · {selected.location}</p></div><span className={`statusPill ${selected.statusTone}`}>{selected.status}</span></div>
+          <div className="detailMeta"><span>{t.dashboardFiledOn}<b>{selected.filedOn}</b></span><span>{t.dashboardCaseId}<b>{selected.id}</b></span></div>
+          <div className="amazonTimeline">
+            {selected.updates.map((update, i) => (
+              <div className={`amazonStep ${update.done ? "done" : "next"}`} key={`${update.title}-${i}`}>
+                <div className="amazonRail"><span>{update.icon}</span>{i < selected.updates.length - 1 && <i />}</div>
+                <div className="amazonContent"><div><h3>{update.title}</h3><time>{update.date}</time></div><p>{update.detail}</p>{update.done && i > 0 && <em>{t.dashboardVerifiedUpdate}</em>}</div>
+              </div>
+            ))}
+          </div>
+          <div className="aiDemoBox"><div><span>✦ {t.dashboardAiKicker}</span><b>{t.dashboardAiTitle}</b><p>{t.dashboardAiBody}</p></div><button className="secondary" onClick={() => createJourney(selected.id)}>{t.dashboardRegenerate}</button></div>
+        </section>
+      </main>
+    </>
   );
 }
 
