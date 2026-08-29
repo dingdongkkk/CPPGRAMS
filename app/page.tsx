@@ -11,6 +11,29 @@ import {
   type Dict,
   type LangCode,
 } from "./i18n";
+import {
+  AshokaChakra,
+  IconAlert,
+  IconArrowLeft,
+  IconArrowRight,
+  IconCheck,
+  IconClock,
+  IconClose,
+  IconDownload,
+  IconGrid,
+  IconHash,
+  IconInfo,
+  IconLanguages,
+  IconLock,
+  IconMail,
+  IconMic,
+  IconPhone,
+  IconPin,
+  IconPlus,
+  IconSpark,
+  IconStop,
+} from "./icons";
+import ProcessCarousel from "./ProcessCarousel";
 
 type Screen =
   | "home"
@@ -20,7 +43,8 @@ type Screen =
   | "confirm"
   | "appeal"
   | "appeal-track"
-  | "closed";
+  | "closed"
+  | "dashboard";
 type PortalPanel =
   | "about"
   | "contact"
@@ -725,7 +749,7 @@ export default function Home() {
                 onClick={() => setShowSecurityGate(true)}
               >
                 {t.start}
-                <span>→</span>
+                <IconArrowRight size={16} />
               </button>
               <button
                 className="secondary"
@@ -735,9 +759,9 @@ export default function Home() {
               </button>
             </div>
             <div className="trustRow">
-              <span>🎙 {t.trustVoice}</span>
-              <span>⌖ {t.trustGps}</span>
-              <span>文 {t.trustLanguages}</span>
+              <span><IconMic size={15} />{t.trustVoice}</span>
+              <span><IconPin size={15} />{t.trustGps}</span>
+              <span><IconLanguages size={15} />{t.trustLanguages}</span>
             </div>
           </div>
           <div className="promiseCard">
@@ -783,11 +807,31 @@ export default function Home() {
               placeholder={t.filerNamePlaceholder}
             />
           </div>
-          <p>🔒 {t.prototypeNote}</p>
+          <p><IconLock size={14} />{t.prototypeNote}</p>
+        </section>
+        <ProcessCarousel
+          t={t}
+          onFile={() => setShowSecurityGate(true)}
+        />
+        <section className="scopeNote" aria-labelledby="scope-title">
+          <div className="scopeHead">
+            <IconAlert size={18} />
+            <div>
+              <h2 id="scope-title">{t.scopeTitle}</h2>
+              <p>{t.scopeBody}</p>
+            </div>
+          </div>
+          <ul>
+            <li>{t.scope1}</li>
+            <li>{t.scope2}</li>
+            <li>{t.scope3}</li>
+            <li>{t.scope4}</li>
+          </ul>
+          <p className="scopeFee">{t.scopeNote}</p>
         </section>
         <section className="qualitySignals" aria-label={t.qualitySignalsTitle}>
           <div className="qualitySignalIntro">
-            <span className="signalIcon">◎</span>
+            <span className="signalIcon"><IconInfo size={18} /></span>
             <div>
               <span className="signalKicker">{t.qualitySignalsKicker}</span>
               <h2>{t.qualitySignalsTitle}</h2>
@@ -877,7 +921,7 @@ export default function Home() {
           <span>✓</span>
           {toast}
           <button onClick={() => setToast("")} aria-label="Dismiss">
-            ×
+            <IconClose size={16} />
           </button>
         </div>
       )}
@@ -902,14 +946,14 @@ export default function Home() {
           aria-labelledby="permission-title"
         >
           <div className="permissionDialog">
-            <span className="permissionIcon">◉</span>
+            <span className="permissionIcon"><IconMic size={20} /></span>
             <div>
               <em>{t.permKicker}</em>
               <h2 id="permission-title">{t.permTitle}</h2>
               <p>{t.permBody}</p>
               <ul>
-                <li>🎙 {t.permMic}</li>
-                <li>⌖ {t.permLoc}</li>
+                <li><IconMic size={15} />{t.permMic}</li>
+                <li><IconPin size={15} />{t.permLoc}</li>
               </ul>
               <small>{t.permNote}</small>
             </div>
@@ -1103,7 +1147,7 @@ function LanguagePicker({
               >
                 <b>{option.native}</b>
                 <small>{option.english}</small>
-                <i aria-hidden="true">✓</i>
+                <i aria-hidden="true"><IconCheck size={13} /></i>
               </button>
             </li>
           ))}
@@ -1113,7 +1157,7 @@ function LanguagePicker({
           onClick={() => onChoose(highlighted)}
         >
           {t.pickContinue}
-          <span>→</span>
+          <IconArrowRight size={16} />
         </button>
         <small className="languageFooter">{t.pickFooter}</small>
       </section>
@@ -1145,8 +1189,8 @@ function TrackingLookup({
   return (
     <div className="trackingOverlay" role="dialog" aria-modal="true" aria-labelledby="tracking-title">
       <section className="trackingLookup">
-        <button className="gateClose" onClick={close} aria-label={t.closeWord}>×</button>
-        <span className="trackingIcon">#</span>
+        <button className="gateClose" onClick={close} aria-label={t.closeWord}><IconClose size={18} /></button>
+        <span className="trackingIcon"><IconHash size={20} /></span>
         <p className="trackingKicker">{t.tlKicker}</p>
         <h2 id="tracking-title">{t.tlTitle}</h2>
         <p className="trackingIntro">{t.tlIntro}</p>
@@ -1172,7 +1216,7 @@ function TrackingLookup({
           disabled={loading || issue.trim().length < 10 || name.trim().length < 2}
           onClick={submit}
         >
-          {loading ? t.checking : t.tlButton}<span>→</span>
+          {loading ? t.checking : t.tlButton}<IconArrowRight size={16} />
         </button>
         <small className="trackingPrivacy">{t.tlPrivacy}</small>
       </section>
@@ -1210,7 +1254,7 @@ function SecurityGate({
     >
       <section className="securityGate">
         <button className="gateClose" onClick={close} aria-label={t.closeWord}>
-          ×
+          <IconClose size={18} />
         </button>
         <div className="securityHeading">
           <span>✓</span>
@@ -1221,7 +1265,7 @@ function SecurityGate({
           </div>
         </div>
         <div className={`securityStep ${digiVerified ? "complete" : ""}`}>
-          <span className="securityNumber">{digiVerified ? "✓" : "1"}</span>
+          <span className="securityNumber">{digiVerified ? <IconCheck size={14} /> : "1"}</span>
           <div>
             <div className="securityStepTitle">
               <b>{t.secStep1Title}</b>
@@ -1230,7 +1274,7 @@ function SecurityGate({
             <p>{t.secStep1Body}</p>
             {digiVerified ? (
               <div className="verifiedIdentity">
-                <b>✓ {t.secVerifiedOk}</b>
+                <b><IconCheck size={14} />{t.secVerifiedOk}</b>
                 <small>
                   {captchaMode === "demo"
                     ? t.secDemoIdentity
@@ -1244,13 +1288,13 @@ function SecurityGate({
                   {t.digiVerify}
                   <small>{t.digiVerifySub}</small>
                 </span>
-                <b>→</b>
+                <IconArrowRight size={16} />
               </a>
             )}
           </div>
         </div>
         <div className={`securityStep ${captchaToken ? "complete" : ""}`}>
-          <span className="securityNumber">{captchaToken ? "✓" : "2"}</span>
+          <span className="securityNumber">{captchaToken ? <IconCheck size={14} /> : "2"}</span>
           <div>
             <div className="securityStepTitle">
               <b>{t.secStep2Title}</b>
@@ -1264,7 +1308,7 @@ function SecurityGate({
           </div>
         </div>
         <div className="securityPrivacy">
-          <span>🔒</span>
+          <span><IconLock size={18} /></span>
           <p>
             <b>{t.secPrivacyTitle}</b>
             <br />
@@ -1277,7 +1321,7 @@ function SecurityGate({
           onClick={complete}
         >
           {loading ? t.checking : t.secContinue}
-          <span>→</span>
+          <IconArrowRight size={16} />
         </button>
       </section>
     </div>
@@ -1361,18 +1405,29 @@ function Header({
   const meta = getLanguage(language);
   return (
     <header className="siteHeader">
+      {/* Tricolour rule: a 3px civic marker, not a decorative gradient. */}
+      <div className="tricolour" aria-hidden="true">
+        <i />
+        <i />
+        <i />
+      </div>
       <button
         className="brand brandButton"
         onClick={onHome}
         aria-label={t.homeAria}
       >
-        <span className="brandMark">{meta.mark}</span>
-        <span>
-          JanSetu <small>{meta.brand}</small>
+        <span className="brandMark">
+          <AshokaChakra size={30} />
+        </span>
+        <span className="brandText">
+          <b>
+            JanSetu <em lang={language}>{meta.brand}</em>
+          </b>
+          <small>{t.brandSub}</small>
         </span>
       </button>
       <div className="headerRight">
-        {openDashboard && <button className="dashboardButton" onClick={openDashboard}>▦ {t.dashboardLabel}</button>}
+        {openDashboard && <button className="dashboardButton" onClick={openDashboard}><IconGrid size={15} />{t.dashboardLabel}</button>}
         {openPanel && (
           <button className="headerInfo" onClick={() => openPanel("contact")}>
             {t.portalContact}
@@ -1384,7 +1439,7 @@ function Header({
           onClick={openPicker}
           aria-label={t.languageCta}
         >
-          <i aria-hidden="true">⟳</i>
+          <IconLanguages size={15} />
           <span lang={language}>{meta.native}</span>
         </button>
       </div>
@@ -1414,7 +1469,7 @@ function Dashboard({
     <>
       <section className="dashboardHero">
         <div>
-          <button className="dashboardBack" onClick={backHome}>← {t.returnHome}</button>
+          <button className="dashboardBack" onClick={backHome}><IconArrowLeft size={16} /> {t.returnHome}</button>
           <p className="dashboardKicker">{t.dashboardKicker}</p>
           <h1>{t.dashboardTitle}</h1>
           <p>{t.dashboardBody}</p>
@@ -1426,7 +1481,7 @@ function Dashboard({
       </section>
       {loading && <section className="dashboardEmpty"><span>◌</span><h2>{t.dashboardLoading}</h2><p>{t.dashboardLoadingBody}</p></section>}
       {!loading && error && <section className="dashboardEmpty dashboardError"><span>!</span><h2>{t.dashboardCouldNotLoad}</h2><p>{error}</p></section>}
-      {!loading && !error && !selected && <section className="dashboardEmpty"><span>▦</span><h2>{t.dashboardEmptyTitle}</h2><p>{t.dashboardEmptyBody}</p><button className="primary compact" onClick={backHome}>{t.dashboardFileNew}<span>→</span></button></section>}
+      {!loading && !error && !selected && <section className="dashboardEmpty"><span><IconGrid size={22} /></span><h2>{t.dashboardEmptyTitle}</h2><p>{t.dashboardEmptyBody}</p><button className="primary compact" onClick={backHome}>{t.dashboardFileNew}<IconArrowRight size={16} /></button></section>}
       {!loading && !error && selected && (
       <main className="dashboardLayout">
         <aside className="complaintListCard">
@@ -1439,7 +1494,7 @@ function Dashboard({
               </button>
             ))}
           </div>
-          <button className="primary compact dashboardFileButton" onClick={backHome}>{t.dashboardFileNew}<span>→</span></button>
+          <button className="primary compact dashboardFileButton" onClick={backHome}>{t.dashboardFileNew}<IconArrowRight size={16} /></button>
         </aside>
         <section className="dashboardDetail">
           <div className="detailTopline"><div><span>{t.dashboardTrackingKicker}</span><h2>{selected.subject}</h2><p>{selected.department} · {selected.location}</p></div><span className={`statusPill ${selected.statusTone}`}>{selected.status}</span></div>
@@ -1452,7 +1507,7 @@ function Dashboard({
               </div>
             ))}
           </div>
-          <div className="journeySourceNote"><span>✦ {t.dashboardJourneyKicker}</span><p>{t.dashboardJourneyBody}</p></div>
+          <div className="journeySourceNote"><span><IconSpark size={14} />{t.dashboardJourneyKicker}</span><p>{t.dashboardJourneyBody}</p></div>
         </section>
       </main>
       )}
@@ -1478,21 +1533,21 @@ function PortalPanelView({
 
   const content = {
     about: {
-      icon: "◎",
+      icon: <IconInfo size={20} />,
       kicker: t.portalAboutKicker,
       title: t.portalAboutTitle,
       body: t.portalAboutBody,
       items: [t.portalAboutItem1, t.portalAboutItem2, t.portalAboutItem3],
     },
     contact: {
-      icon: "☎",
+      icon: <IconPhone size={20} />,
       kicker: t.portalContactKicker,
       title: t.portalContactTitle,
       body: t.portalContactBody,
       items: [t.portalContactItem1, t.portalContactItem2, t.portalContactItem3],
     },
     help: {
-      icon: "?",
+      icon: <IconInfo size={20} />,
       kicker: t.portalHelpKicker,
       title: t.portalHelpTitle,
       body: t.portalHelpBody,
@@ -1534,7 +1589,7 @@ function PortalPanelView({
       items: [t.portalMobileItem1, t.portalMobileItem2, t.portalMobileItem3],
     },
     signin: {
-      icon: "→",
+      icon: <IconArrowRight size={20} />,
       kicker: t.portalSigninKicker,
       title: t.portalSigninTitle,
       body: t.portalSigninBody,
@@ -1545,38 +1600,43 @@ function PortalPanelView({
   return (
     <div className="portalOverlay" role="dialog" aria-modal="true" aria-labelledby="portal-panel-title">
       <section className="portalPanel">
-        <button className="gateClose" onClick={close} aria-label={t.closeWord}>×</button>
+        <button className="gateClose" onClick={close} aria-label={t.closeWord}><IconClose size={18} /></button>
         <span className="portalPanelIcon">{content.icon}</span>
         <p className="portalPanelKicker">{content.kicker}</p>
         <h2 id="portal-panel-title">{content.title}</h2>
         <p className="portalPanelBody">{content.body}</p>
         <ul className="portalPanelList">
-          {content.items.map((item) => <li key={item}><span>✓</span>{item}</li>)}
+          {content.items.map((item) => <li key={item}><span><IconCheck size={13} /></span>{item}</li>)}
         </ul>
-        {(panel === "contact" || panel === "help" || panel === "about") && (
-          <a className="portalSource" href={panel === "contact" ? "https://pgportal.gov.in/Home/ContactUs" : "https://pgportal.gov.in/Home/Faq"} target="_blank" rel="noreferrer">
-            ↗ {t.portalOfficialSource}
+        {(panel === "contact" || panel === "about") && (
+          <a
+            className="portalSource"
+            href={
+              panel === "contact"
+                ? "https://pgportal.gov.in/Home/ContactUs"
+                : "https://pgportal.gov.in/Home/AboutUs"
+            }
+            target="_blank"
+            rel="noreferrer"
+          >
+            {t.portalOfficialSource}
           </a>
         )}
-        {panel === "help" && (
-          <div className="portalPanelActions">
-            <button className="secondary" onClick={() => { close(); openPanel("contact"); }}>
-              {t.portalContact}
-            </button>
-            <button className="primary compact" onClick={close}>{t.closeWord}</button>
-          </div>
-        )}
-        {panel !== "help" && <button className="primary compact portalPanelButton" onClick={close}>{t.closeWord}</button>}
+        <button className="primary compact portalPanelButton" onClick={close}>
+          {t.closeWord}
+        </button>
       </section>
     </div>
   );
 }
 
-function PanelShell({ children, title, close, t }: { children: ReactNode; title: string; close: () => void; t: Dict }) {
+// Each panel body renders its own <h2 id="portal-panel-title">, which is
+// what aria-labelledby resolves against — so no title prop is needed.
+function PanelShell({ children, close, t }: { children: ReactNode; close: () => void; t: Dict }) {
   return (
     <div className="portalOverlay" role="dialog" aria-modal="true" aria-labelledby="portal-panel-title">
       <section className="portalPanel richPanel">
-        <button className="gateClose" onClick={close} aria-label={t.closeWord}>×</button>
+        <button className="gateClose" onClick={close} aria-label={t.closeWord}><IconClose size={18} /></button>
         {children}
       </section>
     </div>
@@ -1592,7 +1652,7 @@ function ProcessPanel({ t, close }: { t: Dict; close: () => void }) {
     [t.processStep5Title, t.processStep5Body],
   ];
   return (
-    <PanelShell title={t.portalProcessTitle} close={close} t={t}>
+    <PanelShell close={close} t={t}>
       <span className="portalPanelIcon">↗</span>
       <p className="portalPanelKicker">{t.portalProcessKicker}</p>
       <h2 id="portal-panel-title">{t.portalProcessTitle}</h2>
@@ -1622,7 +1682,7 @@ function OfficersPanel({ t, close }: { t: Dict; close: () => void }) {
   ];
   const visible = officers.filter((o) => o.join(" ").toLowerCase().includes(query.toLowerCase()));
   return (
-    <PanelShell title={t.portalOfficersTitle} close={close} t={t}>
+    <PanelShell close={close} t={t}>
       <span className="portalPanelIcon">◌</span>
       <p className="portalPanelKicker">{t.portalOfficersKicker}</p>
       <h2 id="portal-panel-title">{t.portalOfficersTitle}</h2>
@@ -1633,7 +1693,7 @@ function OfficersPanel({ t, close }: { t: Dict; close: () => void }) {
         {visible.map(([department, name, role, phone, email]) => (
           <article className="officerRow" key={department}>
             <div><b>{department}</b><strong>{name}</strong><span>{role}</span></div>
-            <div className="officerContact"><a href={`tel:${phone}`}>☎ {phone}</a><a href={`mailto:${email}`}>✉ {email}</a></div>
+            <div className="officerContact"><a href={`tel:${phone}`}><IconPhone size={14} />{phone}</a><a href={`mailto:${email}`}><IconMail size={14} />{email}</a></div>
           </article>
         ))}
         {!visible.length && <p className="directoryEmpty">{t.directoryEmpty}</p>}
@@ -1651,7 +1711,7 @@ function FaqPanel({ t, close, openPanel }: { t: Dict; close: () => void; openPan
     [t.faq4Question, t.faq4Answer], [t.faq5Question, t.faq5Answer], [t.faq6Question, t.faq6Answer],
   ].filter(([question]) => question.toLowerCase().includes(query.toLowerCase()));
   return (
-    <PanelShell title={t.portalHelpTitle} close={close} t={t}>
+    <PanelShell close={close} t={t}>
       <span className="portalPanelIcon">?</span>
       <p className="portalPanelKicker">{t.portalHelpKicker}</p>
       <h2 id="portal-panel-title">{t.portalHelpTitle}</h2>
@@ -1680,13 +1740,13 @@ function AppealAuthorityPanel({ t, close }: { t: Dict; close: () => void }) {
     ["Atomic Energy", "Nidhi Pandey", "02222027535"],
   ];
   return (
-    <PanelShell title={t.portalAppealTitle} close={close} t={t}>
+    <PanelShell close={close} t={t}>
       <span className="portalPanelIcon">↑</span>
       <p className="portalPanelKicker">{t.portalAppealKicker}</p>
       <h2 id="portal-panel-title">{t.portalAppealTitle}</h2>
       <p className="portalPanelBody">{t.portalAppealBody}</p>
       <div className="appealRule"><b>{t.appealWindowTitle}</b><span>{t.appealWindowValue}</span><p>{t.appealWindowBody}</p></div>
-      <div className="appealDirectory">{officers.map(([department, name, phone]) => <div key={department}><span>{department}</span><b>{name}</b><a href={`tel:${phone}`}>☎ {phone}</a></div>)}</div>
+      <div className="appealDirectory">{officers.map(([department, name, phone]) => <div key={department}><span>{department}</span><b>{name}</b><a href={`tel:${phone}`}><IconPhone size={14} />{phone}</a></div>)}</div>
       <a className="portalSource" href="https://pgportal.gov.in/Home/NodalAuthorityForAppeal" target="_blank" rel="noreferrer">↗ {t.portalOfficialAppeal}</a>
   </PanelShell>
   );
@@ -1697,7 +1757,7 @@ function Journey({ progress, t }: { progress: number; t: Dict }) {
     <nav className="journey" aria-label="Grievance journey">
       {labels.map((label, i) => (
         <span key={label} className={i <= progress ? "active" : ""}>
-          <b>{i < progress ? "✓" : i + 1}</b>
+          <b>{i < progress ? <IconCheck size={13} /> : i + 1}</b>
           <em>{label}</em>
           {i < 3 && <i />}
         </span>
@@ -1768,7 +1828,7 @@ function Describe({
               className={listening ? "stopVoice" : "startVoice"}
               onClick={startVoice}
             >
-              {listening ? `■ ${t.voiceStop}` : `🎙 ${t.voiceStart}`}
+              {listening ? <><IconStop size={15} />{t.voiceStop}</> : <><IconMic size={15} />{t.voiceStart}</>}
             </button>
           </div>
           <label htmlFor="voice-language">{t.voiceLangLabel}</label>
@@ -1898,7 +1958,7 @@ function Describe({
             </label>
           </div>
           <p className="guidedPrompt">
-            ✦ {details.locality
+            <IconSpark size={13} /> {details.locality
               ? details.startedOn
                 ? details.affectedPeople
                   ? details.requestedResolution
@@ -1910,7 +1970,7 @@ function Describe({
           </p>
         </div>
         <div className="locationPanel">
-          <span className="locationPin">⌖</span>
+          <span className="locationPin"><IconPin size={18} /></span>
           <div>
             <b>{gpsLocation ? t.locAdded : t.locAdd}</b>
             <p>
@@ -1943,7 +2003,7 @@ function Describe({
               setFiles(Array.from(e.target.files ?? []).map((f) => f.name))
             }
           />
-          <span>＋</span>
+          <span><IconPlus size={20} /></span>
           <div>
             <b>{t.uploadTitle}</b>
             <p>{files.length ? files.join(", ") : t.uploadHint}</p>
@@ -1959,9 +2019,9 @@ function Describe({
         </div>
         <button className="primary" disabled={loading} onClick={prepare}>
           {loading ? t.preparing : t.prepare}
-          <span>{loading ? "✦" : "→"}</span>
+          {loading ? <IconSpark size={16} /> : <IconArrowRight size={16} />}
         </button>
-        <p className="aiNote">✦ {t.aiNote}</p>
+        <p className="aiNote"><IconSpark size={14} />{t.aiNote}</p>
         <p className="savedNote">✓ {t.saved}</p>
       </section>
       <Nearby t={t} state={selectedState} />
@@ -1973,7 +2033,7 @@ function Nearby({ t, state }: { t: Dict; state: string }) {
     <aside>
       <section className="nearbyCard">
         <div className="cardTop">
-          <span>⌖</span>
+          <span><IconPin size={16} /></span>
           <div>
             <h3>{t.nearbyTitle}</h3>
             <p>{t.nearbySub}</p>
@@ -2001,10 +2061,10 @@ function Nearby({ t, state }: { t: Dict; state: string }) {
             </li>
           ))}
         </ul>
-        <p className="privacy">◉ {t.nearbyPrivacy}</p>
+        <p className="privacy"><IconLock size={13} />{t.nearbyPrivacy}</p>
       </section>
       <section className="helpCard">
-        <span>☎</span>
+        <span><IconPhone size={18} /></span>
         <div>
           <b>{t.helpTitle}</b>
           <p>{t.helpBody}</p>
@@ -2033,7 +2093,7 @@ function Review({
   return (
     <section className="singleCard">
       <div className="reviewBanner">
-        <span>✦</span>
+        <span><IconSpark size={18} /></span>
         <div>
           <b>{t.rvFound}</b>
           <p>{analysis.source === "openai" ? t.rvClassified : t.rvPreview}</p>
@@ -2070,7 +2130,7 @@ function Review({
       </div>
       {analysis.emergencyWarning && (
         <div className="emergencyWarning" role="alert">
-          <b>⚠ {t.emergencyTitle}</b>
+          <b><IconAlert size={15} />{t.emergencyTitle}</b>
           <p>{t.emergencyBody}</p>
         </div>
       )}
@@ -2124,11 +2184,11 @@ function Review({
       </div>
       <div className="buttonRow">
         <button className="secondary" onClick={back}>
-          ← {t.edit}
+          <IconArrowLeft size={16} /> {t.edit}
         </button>
         <button className="primary compact" onClick={submit} disabled={submitting}>
           {submitting ? t.submitting : t.submit}
-          <span>→</span>
+          <IconArrowRight size={16} />
         </button>
       </div>
     </section>
@@ -2164,7 +2224,7 @@ function Track({
             <span>{isAppeal ? t.appealIdLabel : t.grievanceIdLabel}</span>
             <h2>{isAppeal ? "AP-JS-2026-1047" : grievanceId}</h2>
           </div>
-          <button onClick={() => window.print()}>⇩ {t.saveReceipt}</button>
+          <button onClick={() => window.print()}><IconDownload size={15} />{t.saveReceipt}</button>
         </div>
         {isAppeal && (
           <div className="escalationBanner">
@@ -2178,7 +2238,7 @@ function Track({
               className={`timelineItem ${i < shown ? "done" : i === shown ? "current" : "future"}`}
               key={s.title}
             >
-              <span className="timelineDot">{i < shown ? "✓" : i + 1}</span>
+              <span className="timelineDot">{i < shown ? <IconCheck size={13} /> : i + 1}</span>
               <div>
                 <div className="stageLine">
                   <h3>{s.title}</h3>
@@ -2210,12 +2270,12 @@ function Track({
           {shown < 4 ? (
             <button className="primary compact" onClick={advance}>
               {t.next}
-              <span>→</span>
+              <IconArrowRight size={16} />
             </button>
           ) : (
             <button className="primary compact" onClick={onConfirm}>
               {t.confirmResolution}
-              <span>→</span>
+              <IconArrowRight size={16} />
             </button>
           )}
         </div>}
@@ -2275,7 +2335,7 @@ function Track({
           </dl>
         </section>
         <section className="slaCard">
-          <b>◷ {t.slaTitle}</b>
+          <b><IconClock size={15} />{t.slaTitle}</b>
           <p>{t.slaBody}</p>
         </section>
       </aside>
@@ -2364,11 +2424,11 @@ function Appeal({
       </div>
       <div className="buttonRow">
         <button className="secondary" onClick={back}>
-          ← {t.back}
+          <IconArrowLeft size={16} /> {t.back}
         </button>
         <button className="primary compact" onClick={submit}>
           {t.appealSubmit}
-          <span>→</span>
+          <IconArrowRight size={16} />
         </button>
       </div>
     </section>
@@ -2423,7 +2483,7 @@ function Closed({
       </div>
       <div className="buttonRow center">
         <button className="secondary" onClick={() => window.print()}>
-          ⇩ {t.printReceipt}
+          <IconDownload size={15} />{t.printReceipt}
         </button>
         <button className="primary compact" onClick={home}>
           {t.returnHome}

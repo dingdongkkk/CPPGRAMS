@@ -457,6 +457,53 @@ const en = {
   printReceipt: "Print receipt",
   returnHome: "Return home",
 
+  // ── Redress process carousel ─────────────────────────────────────
+  // Steps follow the process described on pgportal.gov.in (About CPGRAMS
+  // and Redress Process Flow).
+  flowKicker: "HOW A GRIEVANCE MOVES",
+  flowTitle: "What happens after you press send",
+  flowBody:
+    "The same seven stages every grievance passes through on CPGRAMS, in plain language.",
+  flowStepOf: "Stage {n} of {total}",
+  flowPrev: "Previous stage",
+  flowNext: "Next stage",
+  flowPause: "Pause",
+  flowPlay: "Play",
+  flowSource: "Process as published on pgportal.gov.in",
+  fl1Title: "You lodge the grievance",
+  fl1Body:
+    "The portal is open 24×7 for any subject related to public service delivery. You can file in your own words — no department name needed.",
+  fl2Title: "A registration number is issued",
+  fl2Body:
+    "You receive a unique registration ID at the moment of filing. Everything that follows is tracked against that one number.",
+  fl3Title: "It is routed to the right authority",
+  fl3Body:
+    "CPGRAMS connects every Ministry, Department and State. Your grievance is forwarded to the office that actually owns the subject.",
+  fl4Title: "A grievance officer examines it",
+  fl4Body:
+    "The named officer at that authority reviews your complaint and the evidence attached to it, and records the action taken.",
+  fl5Title: "You can send a reminder",
+  fl5Body:
+    "While the case is open you may send a reminder or a clarification, and follow the status against your registration number.",
+  fl6Title: "Disposal and your rating",
+  fl6Body:
+    "The authority records a resolution and closes the case. You are then asked to rate whether it actually solved your problem.",
+  fl7Title: "If you rate it poor, you can appeal",
+  fl7Body:
+    "A poor rating enables the appeal option. An appellate authority reviews it independently, trackable by the same number.",
+
+  // ── Scope note (official exclusions) ─────────────────────────────
+  scopeTitle: "What CPGRAMS does not take up",
+  scopeBody:
+    "Four categories are outside the grievance process. Knowing this before you file saves weeks of waiting.",
+  scope1: "RTI matters",
+  scope2: "Court or sub-judice matters",
+  scope3: "Religious matters",
+  scope4:
+    "Government employees' own service matters, unless the prescribed channels are already exhausted",
+  scopeNote:
+    "Government charges no fee for filing a grievance.",
+
   // ── Toasts ───────────────────────────────────────────────────────
   tMoreDetail: "Please add a little more detail so we can route it correctly.",
   tSelectState:

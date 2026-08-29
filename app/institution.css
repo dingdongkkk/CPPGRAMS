@@ -1,0 +1,386 @@
+/* ═══════════════════════════════════════════════════════════════════
+   Institutional pass. Palette anchored to pgportal.gov.in; the intent
+   is the restraint of a public-record document — flat colour, hairline
+   rules, a tight radius scale — rather than a consumer landing page.
+   ═══════════════════════════════════════════════════════════════════ */
+
+:root {
+  --r-sm: 3px;
+  --r-md: 5px;
+  --r-lg: 8px;
+  --rule: #d4dcee;
+}
+
+/* ── Radius discipline ──────────────────────────────────────────────
+   The stack had 16 different radii up to 26px, which reads as a
+   consumer app. Collapse onto three steps. */
+.formCard, .singleCard, .nearbyCard, .helpCard, .promiseCard, .timelineCard,
+.caseAside > section, .confirmCard, .securityGate, .trackingLookup,
+.languageCard, .portalPanel, .permissionDialog, .contentGrid > section {
+  border-radius: var(--r-lg);
+}
+.primary, .secondary, .languageButton, .dashboardButton, .headerInfo,
+.demoChip, .trustRow span, .startVoice, .stopVoice, .smallButton,
+.uploadZone, .locationPanel, .tip, .languageList button {
+  border-radius: var(--r-md);
+}
+.brandMark, .journey b, .securityNumber, .timelineDot {
+  border-radius: var(--r-sm);
+}
+
+/* Shadows: keep only where elevation carries meaning (overlays). */
+.formCard, .nearbyCard, .helpCard, .singleCard, .timelineCard,
+.confirmCard, .qualitySignals, .loginStrip, .signalCards > div {
+  box-shadow: none;
+}
+.securityGate, .trackingLookup, .languageCard, .portalPanel,
+.permissionDialog {
+  box-shadow: 0 18px 48px -24px rgba(10, 26, 66, 0.45);
+}
+
+/* ── Tricolour rule ─────────────────────────────────────────────────
+   A 3px civic marker across the masthead. Deliberately a flat
+   three-band rule, not a gradient. */
+.tricolour {
+  position: absolute;
+  inset: 0 0 auto;
+  display: flex;
+  height: 3px;
+}
+.tricolour i { flex: 1; }
+.tricolour i:nth-child(1) { background: var(--saffron); }
+.tricolour i:nth-child(2) { background: #fff; }
+.tricolour i:nth-child(3) { background: var(--india-green); }
+
+.siteHeader {
+  position: relative;
+  border-bottom: 1px solid var(--rule);
+  background: #fff;
+}
+
+/* ── Brand lockup ───────────────────────────────────────────────────
+   Chakra in the national navy, then a two-line lockup: product name
+   with its endonym, and the service descriptor beneath. */
+.brandMark {
+  background: transparent;
+  color: var(--chakra);
+  width: auto;
+  height: auto;
+  display: grid;
+  place-items: center;
+  padding-inline-end: 11px;
+  margin-inline-end: 11px;
+  border-inline-end: 1px solid var(--rule);
+  font-size: inherit;
+}
+.brandText { display: block; line-height: 1.25; }
+.brandText b {
+  display: block;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+.brandText b em {
+  font-style: normal;
+  font-weight: 600;
+  color: var(--muted);
+  margin-inline-start: 7px;
+  font-size: 14px;
+}
+.brandText small {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.01em;
+}
+
+/* ── Inline icons ───────────────────────────────────────────────────
+   Icons sit on the text baseline at a shared optical size. */
+.trustRow span, .permissionDialog li, .loginStrip p, .privacy,
+.aiNote, .savedNote, .flowSource, .scopeFee, .officerContact a,
+.dashboardButton, .languageButton, .startVoice, .stopVoice,
+.journeySourceNote span, .humanCheck, .guidedPrompt {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.permissionDialog li { display: flex; }
+.trustRow span svg, .loginStrip p svg, .privacy svg, .aiNote svg,
+.permissionDialog li svg, .flowSource svg {
+  flex: 0 0 auto;
+  opacity: 0.75;
+}
+.primary svg, .secondary svg { flex: 0 0 auto; }
+
+/* ── Focus ──────────────────────────────────────────────────────────
+   One visible focus treatment everywhere, at government contrast. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+
+/* ═══ Redress process carousel ═════════════════════════════════════ */
+.flowSection {
+  max-width: 1180px;
+  margin: 8px auto 44px;
+  padding: 30px 24px 26px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-lg);
+  background: #fff;
+}
+.flowHead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 22px;
+  flex-wrap: wrap;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--rule);
+}
+.flowKicker {
+  margin: 0 0 7px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: var(--blue);
+}
+.flowHead h2 {
+  margin: 0 0 8px;
+  font-size: clamp(21px, 2.3vw, 27px);
+  letter-spacing: -0.02em;
+}
+.flowIntro {
+  margin: 0;
+  max-width: 56ch;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.flowControls { display: flex; gap: 6px; }
+.flowControls button {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  background: #fff;
+  color: var(--navy);
+}
+.flowControls button:hover { background: var(--mint); }
+
+/* Numbered track: position indicator and direct navigation in one. */
+.flowTrack {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin: 20px 0 0;
+  padding: 0;
+}
+.flowTrack button {
+  width: 100%;
+  padding: 0 0 9px;
+  background: none;
+  border: 0;
+  text-align: start;
+  color: #93a0bd;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+.flowTrack i {
+  display: block;
+  height: 3px;
+  margin-top: 7px;
+  background: var(--rule);
+}
+.flowTrack button.done { color: var(--blue); }
+.flowTrack button.done i { background: var(--blue); }
+.flowTrack button.current { color: var(--navy); }
+.flowTrack button.current i { background: var(--navy); }
+.flowTrack button:hover i { background: var(--navy); }
+
+.flowStage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 190px;
+  gap: 30px;
+  align-items: start;
+  padding: 26px 0 6px;
+}
+.flowStage:focus-visible { outline-offset: 6px; }
+.flowCount {
+  margin: 0 0 9px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  color: var(--muted);
+}
+.flowStageInner h3 {
+  margin: 0 0 11px;
+  font-size: clamp(19px, 2vw, 24px);
+  letter-spacing: -0.02em;
+  line-height: 1.28;
+}
+.flowStageInner > p {
+  margin: 0;
+  max-width: 62ch;
+  color: #46536f;
+  font-size: 15px;
+  line-height: 1.68;
+}
+.flowStageSide {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+  padding-inline-start: 26px;
+  border-inline-start: 1px solid var(--rule);
+}
+.flowBigNumber {
+  font-size: 54px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: var(--mint);
+}
+.flowSource {
+  margin: 18px 0 0;
+  padding-top: 15px;
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* ═══ Official scope note ══════════════════════════════════════════ */
+.scopeNote {
+  max-width: 1180px;
+  margin: 0 auto 44px;
+  padding: 24px;
+  border: 1px solid var(--rule);
+  border-inline-start: 3px solid var(--plum);
+  border-radius: var(--r-lg);
+  background: var(--plum-tint);
+}
+.scopeHead {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  color: var(--plum);
+}
+.scopeHead h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+  letter-spacing: -0.015em;
+  color: var(--plum);
+}
+.scopeHead p {
+  margin: 0;
+  color: #6b4459;
+  font-size: 14px;
+  line-height: 1.6;
+  max-width: 62ch;
+}
+.scopeNote ul {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(215px, 1fr));
+  gap: 8px;
+  margin: 18px 0 0;
+  padding: 0;
+}
+.scopeNote li {
+  padding: 11px 13px;
+  background: #fff;
+  border: 1px solid #e6d3de;
+  border-radius: var(--r-md);
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: #52334a;
+}
+.scopeFee {
+  margin: 16px 0 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--plum);
+}
+
+@media (max-width: 900px) {
+  .flowStage { grid-template-columns: 1fr; gap: 20px; }
+  .flowStageSide {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 16px 0 0;
+    border-inline-start: 0;
+    border-top: 1px solid var(--rule);
+  }
+  .flowBigNumber { font-size: 38px; }
+  .flowTrack { grid-template-columns: repeat(7, 1fr); }
+  .flowTrack button { font-size: 0; padding-bottom: 4px; }
+  .flowTrack i { margin-top: 0; }
+}
+@media (max-width: 560px) {
+  .flowSection, .scopeNote { padding: 22px 16px; border-radius: 0; border-inline: 0; }
+  .brandText b em { display: none; }
+}
+
+/* ── Masthead: full-bleed rule and border ───────────────────────────
+   .siteHeader is a centred 1180px row, so a rule positioned inside it
+   stopped short of the viewport edge. Pin both to the full width. */
+.siteHeader {
+  max-width: none;
+  padding-inline: max(24px, calc((100vw - 1180px) / 2));
+}
+.siteHeader > .brandButton { margin-inline-start: 0; }
+
+/* Nav sits under the masthead as a real bar, not floating chips. */
+.portalNav {
+  max-width: none;
+  margin: 0 0 34px;
+  padding: 9px max(24px, calc((100vw - 1180px) / 2));
+  justify-content: flex-start;
+  gap: 2px;
+  background: #f7f8fc;
+  border-bottom: 1px solid var(--rule);
+}
+.portalNav button {
+  background: transparent;
+  border: 0;
+  border-radius: var(--r-sm);
+  font-size: 12px;
+  padding: 8px 11px;
+}
+.portalNav button:hover { background: #e7eaf3; }
+
+/* ── Drop the decorative offset ─────────────────────────────────────
+   A 22px hard-offset colour block behind the card is ornament with no
+   informational job. Replace with a flat panel and a saffron rule that
+   marks it as the explanatory aside. */
+.promiseCard {
+  border-radius: var(--r-lg);
+  box-shadow: none;
+  margin-right: 0;
+  border-top: 3px solid var(--saffron);
+  background: var(--navy-deep);
+}
+.promiseCard li > b {
+  border-radius: var(--r-sm);
+  background: var(--saffron);
+  color: var(--navy-deep);
+  font-weight: 800;
+}
+
+/* ── Brand: don't print the product name twice ──────────────────────
+   In English the endonym is the product name, so the lockup read
+   "JanSetu JanSetu". Hidden via :lang rather than a JS branch. */
+.brandText b em:lang(en) { display: none; }

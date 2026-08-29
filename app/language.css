@@ -11,7 +11,7 @@
   overflow-y: auto;
 }
 .languageGate.fullPage {
-  background: radial-gradient(120% 90% at 50% 0%, #eef7f2 0%, #f7fbf9 45%, #fff 100%);
+  background: radial-gradient(120% 90% at 50% 0%, #edf0f8 0%, #f7f8fb 45%, #fff 100%);
 }
 .languageGate.overlay {
   background: rgba(14, 40, 40, 0.55);
@@ -30,7 +30,7 @@
   margin: auto;
 }
 .languageGate.fullPage .languageCard {
-  border-color: #dcebe4;
+  border-color: #dbe0ec;
   box-shadow: 0 40px 90px -44px rgba(13, 60, 58, 0.45);
 }
 
@@ -52,7 +52,7 @@
   font-weight: 800;
   letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: #5c7a76;
+  color: #546082;
 }
 .languageCard h1 {
   margin: 0 0 12px;
@@ -63,7 +63,7 @@
 .languageIntro {
   max-width: 470px;
   margin: 0 auto 26px;
-  color: #5b7371;
+  color: #545e7a;
   font-size: 15px;
   line-height: 1.6;
 }
@@ -86,7 +86,7 @@
   flex-direction: column;
   justify-content: center;
   gap: 3px;
-  background: #fbfdfc;
+  background: #fbfbfd;
   border: 1.5px solid var(--line);
   border-radius: 14px;
   color: var(--ink);
@@ -94,13 +94,13 @@
   transition: border-color 0.15s, background 0.15s, transform 0.1s;
 }
 .languageList button:hover {
-  border-color: #9dc0b6;
-  background: #f4faf7;
+  border-color: #9ba5c2;
+  background: #f4f5fa;
 }
 .languageList button:active { transform: scale(0.99); }
 .languageList button.selected {
   border-color: var(--teal);
-  background: #eef7f2;
+  background: #edf0f8;
   box-shadow: inset 0 0 0 1px var(--teal);
 }
 .languageList b {
@@ -111,7 +111,7 @@
 .languageList small {
   font-size: 12px;
   font-weight: 600;
-  color: #71908b;
+  color: #6f7892;
   letter-spacing: 0.02em;
 }
 .languageList i {
@@ -141,7 +141,7 @@
 .languageFooter {
   display: block;
   margin-top: 14px;
-  color: #7b9491;
+  color: #7a8196;
   font-size: 12.5px;
 }
 
@@ -237,7 +237,7 @@ html:not([lang="en"]) .journey i {
   inset: 0;
   display: grid;
   place-items: center;
-  background: linear-gradient(180deg, #f4faf7 0, #fff 38%);
+  background: linear-gradient(180deg, #f4f5fa 0, #fff 38%);
 }
 .bootSplash .languageMark {
   margin: 0;
