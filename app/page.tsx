@@ -153,6 +153,16 @@ const extraVoiceLanguages = [
   ["bn-BD", "বাংলা (Bangladesh)"],
 ] as const;
 
+const voiceOpening: Record<LangCode, string> = {
+  en: "Hello. Please tell me about the problem in your own words. What happened, and how is it affecting you?",
+  hi: "नमस्ते। कृपया अपनी समस्या अपने शब्दों में बताइए। क्या हुआ है और इससे आपको कैसे परेशानी हो रही है?",
+  bn: "নমস্কার। আপনার সমস্যাটি নিজের ভাষায় বলুন। কী ঘটেছে এবং এতে আপনার কী অসুবিধা হচ্ছে?",
+  mr: "नमस्कार। कृपया तुमची समस्या तुमच्या शब्दांत सांगा. काय घडले आणि त्याचा तुम्हाला कसा त्रास होत आहे?",
+  te: "నమస్కారం. దయచేసి మీ సమస్యను మీ మాటల్లో చెప్పండి. ఏమి జరిగింది, దాని వల్ల మీకు ఎలాంటి ఇబ్బంది కలుగుతోంది?",
+  ta: "வணக்கம். உங்கள் பிரச்சினையை உங்கள் சொந்த வார்த்தைகளில் கூறுங்கள். என்ன நடந்தது, அது உங்களை எவ்வாறு பாதிக்கிறது?",
+  kn: "ನಮಸ್ಕಾರ. ದಯವಿಟ್ಟು ನಿಮ್ಮ ಸಮಸ್ಯೆಯನ್ನು ನಿಮ್ಮ ಮಾತುಗಳಲ್ಲಿ ತಿಳಿಸಿ. ಏನಾಯಿತು ಮತ್ತು ಅದರಿಂದ ನಿಮಗೆ ಯಾವ ತೊಂದರೆಯಾಗುತ್ತಿದೆ?",
+};
+
 const statesAndUTs = [
   "Andhra Pradesh",
   "Arunachal Pradesh",
@@ -1025,6 +1035,9 @@ export default function Home() {
       {screen === "describe" && (
         <Describe
           t={t}
+          language={language}
+          languageName={activeLanguage.native}
+          speechLanguage={activeLanguage.speech}
           description={description}
           setDescription={setDescription}
           loading={loading}
@@ -1810,6 +1823,9 @@ function Journey({ progress, t }: { progress: number; t: Dict }) {
 
 function Describe({
   t,
+  language,
+  languageName,
+  speechLanguage,
   description,
   setDescription,
   loading,
@@ -1832,6 +1848,9 @@ function Describe({
   chooseComplaintLocation,
 }: {
   t: Dict;
+  language: LangCode;
+  languageName: string;
+  speechLanguage: string;
   description: string;
   setDescription: (v: string) => void;
   loading: boolean;
@@ -1854,52 +1873,203 @@ function Describe({
   chooseComplaintLocation: (v: Exclude<ComplaintLocationMatch, "">) => void;
 }) {
   const [filingMode, setFilingMode] = useState<FilingMode>(null);
-  const [aiStep, setAiStep] = useState(0);
   const [aiAnswer, setAiAnswer] = useState("");
-  const [aiHistory, setAiHistory] = useState<Array<{ question: string; answer: string }>>([]);
+  const [aiMessages, setAiMessages] = useState<Array<{ role: "assistant" | "user"; text: string }>>([]);
+  const [aiComplete, setAiComplete] = useState(false);
+  const [aiVoiceStatus, setAiVoiceStatus] = useState<"idle" | "listening" | "thinking" | "speaking" | "error">("idle");
+  const liveConversationRef = useRef(false);
+  const liveRecognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const aiMessagesRef = useRef(aiMessages);
+  const conversationDataRef = useRef({ description, selectedState, details });
+  aiMessagesRef.current = aiMessages;
+  conversationDataRef.current = { description, selectedState, details };
 
-  const aiQuestions = [
-    { id: "description", prompt: t.aiChatQProblem, type: "textarea" },
-    ...(complaintLocationMatch === "different"
-      ? [
-          { id: "state", prompt: t.aiChatQState, type: "state" },
-          { id: "district", prompt: t.aiChatQDistrict, type: "text" },
-          { id: "blockTehsil", prompt: t.aiChatQBlock, type: "text" },
-          { id: "gramPanchayat", prompt: t.aiChatQPanchayat, type: "text" },
-          { id: "locality", prompt: t.aiChatQLocality, type: "text" },
-        ]
-      : []),
-    { id: "startedOn", prompt: t.aiChatQStarted, type: "date" },
-    { id: "frequency", prompt: t.aiChatQFrequency, type: "frequency" },
-    { id: "affectedPeople", prompt: t.aiChatQAffected, type: "text" },
-    { id: "requestedResolution", prompt: t.aiChatQOutcome, type: "text" },
-  ];
-  const activeQuestion = aiQuestions[Math.min(aiStep, aiQuestions.length - 1)];
-  const aiComplete = aiStep >= aiQuestions.length;
-
-  function savedAnswer(id: string) {
-    if (id === "description") return description;
-    if (id === "state") return selectedState;
-    return details[id as keyof ComplaintDetails] || "";
-  }
+  const fallbackQuestions = {
+    description: t.aiChatQProblem,
+    state: t.aiChatQState,
+    district: t.aiChatQDistrict,
+    blockTehsil: t.aiChatQBlock,
+    gramPanchayat: t.aiChatQPanchayat,
+    locality: t.aiChatQLocality,
+    startedOn: t.aiChatQStarted,
+    frequency: t.aiChatQFrequency,
+    affectedPeople: t.aiChatQAffected,
+    requestedResolution: t.aiChatQOutcome,
+  };
 
   function selectMode(mode: Exclude<FilingMode, null>) {
+    stopLiveConversation();
     setFilingMode(mode);
-    setAiStep(0);
-    setAiHistory([]);
-    setAiAnswer(mode === "ai" ? savedAnswer(aiQuestions[0].id) : "");
+    setAiComplete(false);
+    setAiAnswer("");
+    setAiMessages(mode === "ai" ? [{ role: "assistant", text: voiceOpening[language] }] : []);
   }
 
-  function saveConversationalAnswer() {
-    const answer = aiAnswer.trim();
-    if (!answer || !activeQuestion) return;
-    if (activeQuestion.id === "description") setDescription(answer);
-    else if (activeQuestion.id === "state") setSelectedState(answer);
-    else setDetails({ ...details, [activeQuestion.id]: answer });
-    setAiHistory((items) => [...items, { question: activeQuestion.prompt, answer }]);
-    const next = aiStep + 1;
-    setAiStep(next);
-    setAiAnswer(next < aiQuestions.length ? savedAnswer(aiQuestions[next].id) : "");
+  function stopLiveConversation() {
+    liveConversationRef.current = false;
+    liveRecognitionRef.current?.stop();
+    liveRecognitionRef.current = null;
+    if (typeof window !== "undefined") window.speechSynthesis?.cancel();
+    setAiVoiceStatus("idle");
+  }
+
+  function speakAssistant(text: string, resumeListening: boolean) {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+      setAiVoiceStatus("idle");
+      if (resumeListening && liveConversationRef.current) beginLiveListening();
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = speechLanguage;
+    utterance.rate = 0.94;
+    const matchingVoice = window.speechSynthesis
+      .getVoices()
+      .find((voice) => voice.lang.toLowerCase().startsWith(speechLanguage.split("-")[0].toLowerCase()));
+    if (matchingVoice) utterance.voice = matchingVoice;
+    setAiVoiceStatus("speaking");
+    utterance.onend = () => {
+      setAiVoiceStatus("idle");
+      if (resumeListening && liveConversationRef.current) beginLiveListening();
+    };
+    utterance.onerror = () => {
+      setAiVoiceStatus("idle");
+      if (resumeListening && liveConversationRef.current) beginLiveListening();
+    };
+    window.speechSynthesis.speak(utterance);
+  }
+
+  function beginLiveListening() {
+    const speechWindow = window as typeof window & {
+      SpeechRecognition?: new () => SpeechRecognitionLike;
+      webkitSpeechRecognition?: new () => SpeechRecognitionLike;
+    };
+    const Recognition = speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
+    if (!Recognition) {
+      liveConversationRef.current = false;
+      setAiVoiceStatus("error");
+      return;
+    }
+    const recognition = new Recognition();
+    liveRecognitionRef.current = recognition;
+    recognition.lang = speechLanguage;
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+    let finalText = "";
+    let submitted = false;
+    recognition.onstart = () => setAiVoiceStatus("listening");
+    recognition.onresult = (event) => {
+      let interim = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const words = event.results[i][0].transcript;
+        if (event.results[i].isFinal) finalText += `${words} `;
+        else interim += words;
+      }
+      setAiAnswer(`${finalText}${interim}`.trim());
+      if (finalText.trim() && !submitted) {
+        submitted = true;
+        recognition.stop();
+        void sendConversationTurn(finalText.trim());
+      }
+    };
+    recognition.onerror = () => {
+      setAiVoiceStatus("error");
+      liveConversationRef.current = false;
+    };
+    recognition.onend = () => {
+      liveRecognitionRef.current = null;
+      if (!submitted && liveConversationRef.current) setAiVoiceStatus("idle");
+    };
+    try {
+      recognition.start();
+    } catch {
+      liveConversationRef.current = false;
+      setAiVoiceStatus("error");
+    }
+  }
+
+  async function sendConversationTurn(rawAnswer?: string) {
+    const answer = (rawAnswer || aiAnswer).trim();
+    if (!answer || aiVoiceStatus === "thinking") return;
+    const userMessage = { role: "user" as const, text: answer };
+    const history = [...aiMessagesRef.current, userMessage];
+    aiMessagesRef.current = history;
+    setAiMessages(history);
+    setAiAnswer("");
+    setAiVoiceStatus("thinking");
+    const current = conversationDataRef.current;
+    try {
+      const response = await fetch("/api/conversation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userText: answer,
+          language,
+          languageName,
+          locationMatch: complaintLocationMatch,
+          history,
+          captured: {
+            description: current.description,
+            state: current.selectedState,
+            ...current.details,
+          },
+          fallbackQuestions,
+        }),
+      });
+      const result = (await response.json()) as {
+        assistantMessage?: string;
+        complete?: boolean;
+        captured?: {
+          description: string; state: string; district: string; blockTehsil: string;
+          gramPanchayat: string; locality: string; startedOn: string; frequency: string;
+          affectedPeople: string; requestedResolution: string;
+        };
+        error?: string;
+      };
+      if (!response.ok || !result.assistantMessage || !result.captured)
+        throw new Error(result.error || "Conversation unavailable");
+      const captured = result.captured;
+      const nextDetails = {
+        district: captured.district,
+        blockTehsil: captured.blockTehsil,
+        gramPanchayat: captured.gramPanchayat,
+        locality: captured.locality,
+        startedOn: captured.startedOn,
+        frequency: captured.frequency || "Ongoing",
+        affectedPeople: captured.affectedPeople,
+        requestedResolution: captured.requestedResolution,
+      };
+      setDescription(captured.description || current.description);
+      if (captured.state) setSelectedState(captured.state);
+      setDetails(nextDetails);
+      conversationDataRef.current = {
+        description: captured.description || current.description,
+        selectedState: captured.state || current.selectedState,
+        details: nextDetails,
+      };
+      const assistantMessage = { role: "assistant" as const, text: result.assistantMessage };
+      const nextMessages = [...history, assistantMessage];
+      aiMessagesRef.current = nextMessages;
+      setAiMessages(nextMessages);
+      setAiComplete(Boolean(result.complete));
+      speakAssistant(result.assistantMessage, !result.complete);
+    } catch {
+      liveConversationRef.current = false;
+      setAiVoiceStatus("error");
+    }
+  }
+
+  function toggleLiveConversation() {
+    if (liveConversationRef.current) {
+      stopLiveConversation();
+      return;
+    }
+    liveConversationRef.current = true;
+    const prompt = aiMessagesRef.current.at(-1)?.role === "assistant"
+      ? aiMessagesRef.current.at(-1)?.text || voiceOpening[language]
+      : voiceOpening[language];
+    speakAssistant(prompt, true);
   }
 
   return (
@@ -1939,38 +2109,55 @@ function Describe({
             <div className="aiConversationHeader">
               <span><IconSpark size={17} /></span>
               <div><b>{t.aiChatTitle}</b><small>{t.aiChatBody}</small></div>
-              <em>{Math.min(aiStep + 1, aiQuestions.length)} / {aiQuestions.length}</em>
+              <em className={`liveVoiceState ${aiVoiceStatus}`}>
+                {aiVoiceStatus === "listening" ? t.aiVoiceListening
+                  : aiVoiceStatus === "thinking" ? t.aiVoiceThinking
+                    : aiVoiceStatus === "speaking" ? t.aiVoiceSpeaking
+                      : aiVoiceStatus === "error" ? t.aiVoiceError
+                        : t.aiVoiceReady}
+              </em>
             </div>
             <div className="aiChatHistory">
-              {aiHistory.map((item, index) => (
-                <div className="aiChatExchange" key={`${item.question}-${index}`}>
-                  <p>{item.question}</p><div>{item.answer}</div>
+              {aiMessages.map((item, index) => (
+                <div className={`aiChatMessage ${item.role}`} key={`${item.role}-${index}`}>
+                  <span>{item.role === "assistant" ? <IconSpark size={13} /> : <IconUser size={13} />}</span>
+                  <p>{item.text}</p>
                 </div>
               ))}
             </div>
             {!aiComplete ? (
               <div className="aiChatCurrent">
-                <p><span>AI</span>{activeQuestion.prompt}</p>
-                {activeQuestion.type === "textarea" ? (
-                  <textarea value={aiAnswer} onChange={(e) => setAiAnswer(e.target.value)} placeholder={t.aiChatAnswerPlaceholder} />
-                ) : activeQuestion.type === "state" ? (
-                  <select value={aiAnswer} onChange={(e) => setAiAnswer(e.target.value)}>
-                    <option value="">{t.selectState}</option>
-                    {statesAndUTs.map((state) => <option key={state} value={state}>{state}</option>)}
-                  </select>
-                ) : activeQuestion.type === "frequency" ? (
-                  <select value={aiAnswer} onChange={(e) => setAiAnswer(e.target.value)}>
-                    <option value="">{t.aiChatChoose}</option>
-                    <option value="Ongoing">{t.freqOngoing}</option><option value="Every day">{t.freqDaily}</option>
-                    <option value="Intermittent">{t.freqIntermittent}</option><option value="One-time incident">{t.freqOneTime}</option>
-                  </select>
-                ) : (
-                  <input type={activeQuestion.type} value={aiAnswer} onChange={(e) => setAiAnswer(e.target.value)} placeholder={t.aiChatAnswerPlaceholder} />
-                )}
-                <button className="primary compact" disabled={!aiAnswer.trim()} onClick={saveConversationalAnswer}>{t.aiChatNext}<IconArrowRight size={15} /></button>
+                <div className="liveVoiceControls">
+                  <button
+                    className={liveConversationRef.current ? "stopVoice liveConversationButton" : "startVoice liveConversationButton"}
+                    onClick={toggleLiveConversation}
+                    disabled={aiVoiceStatus === "thinking"}
+                  >
+                    {liveConversationRef.current
+                      ? <><IconStop size={16} />{t.aiVoicePause}</>
+                      : <><IconMic size={16} />{t.aiVoiceStart}</>}
+                  </button>
+                  <div className={`voicePulse ${aiVoiceStatus}`}><i /><i /><i /><i /></div>
+                </div>
+                <p className="liveVoiceHint">{t.aiVoiceHint}</p>
+                <div className="typedChatFallback">
+                  <input
+                    value={aiAnswer}
+                    onChange={(e) => setAiAnswer(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") void sendConversationTurn(); }}
+                    placeholder={t.aiChatAnswerPlaceholder}
+                    disabled={aiVoiceStatus === "thinking"}
+                  />
+                  <button
+                    className="primary compact"
+                    disabled={!aiAnswer.trim() || aiVoiceStatus === "thinking"}
+                    onClick={() => void sendConversationTurn()}
+                    aria-label={t.aiChatNext}
+                  ><IconArrowRight size={15} /></button>
+                </div>
               </div>
             ) : (
-              <div className="aiChatComplete"><IconCheck size={22} /><div><b>{t.aiChatCompleteTitle}</b><p>{t.aiChatCompleteBody}</p></div></div>
+              <div className="aiChatComplete"><IconCheck size={22} /><div><b>{t.aiChatCompleteTitle}</b><p>{t.aiChatCompleteBody}</p><button className="secondary" onClick={() => { setAiComplete(false); setAiMessages((items) => [...items, { role: "assistant", text: t.aiChatAnythingElse }]); }}>{t.aiChatAddMore}</button></div></div>
             )}
           </div>
         )}
