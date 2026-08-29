@@ -186,59 +186,6 @@ function urgencyLabel(t: Dict, urgency: Analysis["urgency"]) {
         : t.urgencyLow;
 }
 
-function createDemoJourney(subject: string, department: string, location: string, seed = Date.now()): DashboardUpdate[] {
-  const text = `${subject} ${department}`.toLowerCase();
-  const water = text.includes("water") || text.includes("irrigation") || text.includes("drain");
-  const roads = text.includes("road") || text.includes("pothole") || text.includes("bridge");
-  const power = text.includes("power") || text.includes("electric");
-  const action = water
-    ? `A field crew has been assigned to inspect the supply line near ${location}.`
-    : roads
-      ? `The junior engineer has marked the location for a site inspection near ${location}.`
-      : power
-        ? `The local maintenance team has been asked to inspect the feeder serving ${location}.`
-        : `The concerned field officer has scheduled a verification visit near ${location}.`;
-  const work = water
-    ? "Labourers and a pump team have been sent to clear the blockage and restore flow."
-    : roads
-      ? "Repair workers have been sent with material to make the location safe."
-      : power
-        ? "A maintenance crew has been sent to check the line and replace the damaged part."
-        : "The department has sent a field team to carry out the reported corrective action.";
-  const day = (offset: number) => new Date(seed - offset * 86400000).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
-  return [
-    { title: "Complaint received", detail: "Your complaint was registered and a unique case number was created.", date: day(0), done: true, icon: "✓" },
-    { title: "Reached the right department", detail: `${department} has accepted the case for ${location}.`, date: day(0), done: true, icon: "↗" },
-    { title: "Officer assigned", detail: "The grievance officer responsible for coordinating this issue has been assigned.", date: day(1), done: true, icon: "◎" },
-    { title: "Action team on the ground", detail: action, date: day(2), done: true, icon: "⌖" },
-    { title: "Repair work started", detail: work, date: day(3), done: false, icon: "⚒" },
-    { title: "You confirm the result", detail: "When the department reports completion, you decide whether the issue is actually fixed.", date: "Next step", done: false, icon: "?" },
-  ];
-}
-
-const initialDashboardComplaints: DashboardComplaint[] = [
-  {
-    id: "JS-2026-WTR-1842",
-    subject: "No water supply in Ward 6",
-    department: "Water Resources Department, Bihar",
-    location: "Gaya, Bihar",
-    status: "Action team on the ground",
-    statusTone: "blue",
-    filedOn: "28 Aug 2026",
-    updates: createDemoJourney("No water supply", "Water Resources Department, Bihar", "Gaya, Bihar", new Date("2026-08-31T10:00:00").getTime()),
-  },
-  {
-    id: "JS-2026-ROAD-0931",
-    subject: "Pothole near the primary school",
-    department: "Rural Works Department, Bihar",
-    location: "Nalanda, Bihar",
-    status: "Officer assigned",
-    statusTone: "amber",
-    filedOn: "26 Aug 2026",
-    updates: createDemoJourney("Pothole near the primary school", "Rural Works Department, Bihar", "Nalanda, Bihar", new Date("2026-08-29T10:00:00").getTime()).map((item, i) => ({ ...item, done: i < 3 })),
-  },
-];
-
 export default function Home() {
   const [screen, setScreen] = useState<Screen>("home");
   const [language, setLanguage] = useState<LangCode>("en");
@@ -288,8 +235,10 @@ export default function Home() {
   const [resolutionFeedback, setResolutionFeedback] = useState<"resolved" | "not-resolved" | "">("");
   const [processRating, setProcessRating] = useState(0);
   const [portalPanel, setPortalPanel] = useState<PortalPanel>(null);
-  const [dashboardComplaints, setDashboardComplaints] = useState<DashboardComplaint[]>(initialDashboardComplaints);
-  const [selectedDashboardId, setSelectedDashboardId] = useState(initialDashboardComplaints[0].id);
+  const [dashboardComplaints, setDashboardComplaints] = useState<DashboardComplaint[]>([]);
+  const [selectedDashboardId, setSelectedDashboardId] = useState("");
+  const [dashboardLoading, setDashboardLoading] = useState(false);
+  const [dashboardError, setDashboardError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const continueListeningRef = useRef(false);
@@ -419,7 +368,7 @@ export default function Home() {
         }),
       });
       const result = (await response.json()) as {
-        complaint?: { issueNumber: string };
+        complaint?: { issueNumber: string; journey?: DashboardUpdate[]; createdAt?: string };
         error?: string;
       };
       if (!response.ok || !result.complaint) {
@@ -435,7 +384,7 @@ export default function Home() {
         status: "Complaint received",
         statusTone: "green",
         filedOn: new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
-        updates: createDemoJourney(analysis.category, analysis.department, analysis.location),
+        updates: result.complaint.journey || [],
       };
       setDashboardComplaints((items) => [dashboardCase, ...items]);
       setSelectedDashboardId(dashboardCase.id);
@@ -488,6 +437,40 @@ export default function Home() {
       setTrackingLoading(false);
     }
   }
+
+  useEffect(() => {
+    if (screen !== "dashboard") return;
+    if (name.trim().length < 2) {
+      setDashboardComplaints([]);
+      setDashboardError("");
+      return;
+    }
+    let cancelled = false;
+    setDashboardLoading(true);
+    fetch(`/api/complaints?name=${encodeURIComponent(name)}`)
+      .then(async (response) => {
+        const result = (await response.json()) as { complaints?: Array<{
+          issueNumber: string; category: string; department: string; location: string; status: string; createdAt: string; journey: DashboardUpdate[];
+        }>; error?: string };
+        if (!response.ok) throw new Error(result.error || "Could not load your complaints.");
+        if (cancelled) return;
+        const rows = result.complaints || [];
+        setDashboardComplaints(rows.map((row) => ({
+          id: row.issueNumber,
+          subject: row.category,
+          department: row.department,
+          location: row.location,
+          status: row.status,
+          statusTone: row.status === "Assigned to officer" ? "amber" : "blue",
+          filedOn: row.createdAt,
+          updates: row.journey || [],
+        })));
+        setSelectedDashboardId((current) => rows.some((row) => row.issueNumber === current) ? current : rows[0]?.issueNumber || "");
+      })
+      .catch((error) => { if (!cancelled) setDashboardError(error instanceof Error ? error.message : "Could not load your complaints."); })
+      .finally(() => { if (!cancelled) setDashboardLoading(false); });
+    return () => { cancelled = true; };
+  }, [screen, name]);
 
   function advanceStage() {
     if (stage < 4) {
@@ -880,7 +863,8 @@ export default function Home() {
           complaints={dashboardComplaints}
           selectedId={selectedDashboardId}
           selectComplaint={setSelectedDashboardId}
-          createJourney={(id) => setDashboardComplaints((items) => items.map((item) => item.id === id ? { ...item, updates: createDemoJourney(item.subject, item.department, item.location), status: "Action team on the ground", statusTone: "blue" } : item))}
+          loading={dashboardLoading}
+          error={dashboardError}
           backHome={() => setScreen("home")}
         />
       </main>
@@ -1413,14 +1397,16 @@ function Dashboard({
   complaints,
   selectedId,
   selectComplaint,
-  createJourney,
+  loading,
+  error,
   backHome,
 }: {
   t: Dict;
   complaints: DashboardComplaint[];
   selectedId: string;
   selectComplaint: (id: string) => void;
-  createJourney: (id: string) => void;
+  loading: boolean;
+  error: string;
   backHome: () => void;
 }) {
   const selected = complaints.find((item) => item.id === selectedId) || complaints[0];
@@ -1438,6 +1424,10 @@ function Dashboard({
           <div><b>{t.ministryName}</b><span>{t.ministrySub}</span></div>
         </div>
       </section>
+      {loading && <section className="dashboardEmpty"><span>◌</span><h2>{t.dashboardLoading}</h2><p>{t.dashboardLoadingBody}</p></section>}
+      {!loading && error && <section className="dashboardEmpty dashboardError"><span>!</span><h2>{t.dashboardCouldNotLoad}</h2><p>{error}</p></section>}
+      {!loading && !error && !selected && <section className="dashboardEmpty"><span>▦</span><h2>{t.dashboardEmptyTitle}</h2><p>{t.dashboardEmptyBody}</p><button className="primary compact" onClick={backHome}>{t.dashboardFileNew}<span>→</span></button></section>}
+      {!loading && !error && selected && (
       <main className="dashboardLayout">
         <aside className="complaintListCard">
           <div className="dashboardCardHeader"><div><span>{t.dashboardCasesKicker}</span><h2>{t.dashboardCasesTitle}</h2></div><b>{complaints.length}</b></div>
@@ -1462,9 +1452,10 @@ function Dashboard({
               </div>
             ))}
           </div>
-          <div className="aiDemoBox"><div><span>✦ {t.dashboardAiKicker}</span><b>{t.dashboardAiTitle}</b><p>{t.dashboardAiBody}</p></div><button className="secondary" onClick={() => createJourney(selected.id)}>{t.dashboardRegenerate}</button></div>
+          <div className="journeySourceNote"><span>✦ {t.dashboardJourneyKicker}</span><p>{t.dashboardJourneyBody}</p></div>
         </section>
       </main>
+      )}
     </>
   );
 }

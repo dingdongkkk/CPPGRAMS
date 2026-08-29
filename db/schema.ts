@@ -15,6 +15,7 @@ export const complaints = sqliteTable(
     assignedOfficer: text("assigned_officer").notNull().default("Department Grievance Officer"),
     status: text("status").notNull().default("Assigned to officer"),
     stage: integer("stage").notNull().default(1),
+    journeyJson: text("journey_json").notNull().default("[]"),
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   },
   (table) => [

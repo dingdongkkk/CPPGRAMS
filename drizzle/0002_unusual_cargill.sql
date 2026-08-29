@@ -1,0 +1,1 @@
+ALTER TABLE `complaints` ADD `journey_json` text DEFAULT '[]' NOT NULL;
