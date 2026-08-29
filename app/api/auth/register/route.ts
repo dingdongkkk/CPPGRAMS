@@ -8,8 +8,19 @@ import {
   otpExpiry,
   sha256,
 } from "../../../lib/auth";
-import { sendOtpEmail } from "../../../lib/email";
 
+/**
+ * Registration step 1: identity is already proven, capture the email and
+ * issue a one-time code.
+ *
+ * DEMO DELIVERY. There is no mail provider, so the code is returned in the
+ * response and shown on screen instead of being emailed. That means anyone
+ * can complete verification for an address they do not control, so this is
+ * a prototype-only arrangement — a real deployment must send the code out
+ * of band and stop returning `demoCode`. It is labelled in the payload and
+ * warned about in the logs so the behaviour is never mistaken for real
+ * email verification.
+ */
 export async function POST(request: Request) {
   // Identity and human checks come first, exactly as the portal orders them.
   const cookie = request.headers.get("cookie") || "";
@@ -47,19 +58,18 @@ export async function POST(request: Request) {
       expiresAt: otpExpiry(),
     });
 
-    const sent = await sendOtpEmail(email, code);
-    if (!sent.ok) {
-      return Response.json(
-        {
-          error:
-            sent.reason === "not_configured"
-              ? "Email delivery is not configured yet, so the code could not be sent."
-              : "We could not send the code just now. Please try again.",
-        },
-        { status: 503 },
-      );
-    }
-    return Response.json({ ok: true, email });
+    console.warn(
+      "[auth] DEMO OTP issued for %s — code returned to the caller, not emailed",
+      email,
+    );
+    return Response.json({
+      ok: true,
+      email,
+      demo: true,
+      demoCode: code,
+      demoNotice:
+        "Demo mode: this code is shown on screen because email delivery is not configured.",
+    });
   } catch {
     return Response.json({ error: "Registration could not be started." }, { status: 500 });
   }
