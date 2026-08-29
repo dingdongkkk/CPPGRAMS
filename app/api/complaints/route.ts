@@ -31,7 +31,12 @@ function issueNumber() {
 
 function databaseError(error: unknown) {
   const message = error instanceof Error ? error.message : "Database unavailable";
-  return message.includes("no such table")
+  // Postgres phrases a missing table as `relation "..." does not exist`,
+  // where D1/SQLite said `no such table`. Both are matched so the friendlier
+  // "being prepared" message still shows before migrations have run.
+  const missingTable =
+    /no such table/i.test(message) || /relation .* does not exist/i.test(message);
+  return missingTable
     ? "Complaint storage is being prepared. Please try again shortly."
     : "Complaint service is temporarily unavailable.";
 }
@@ -116,7 +121,10 @@ export async function POST(request: Request) {
           .returning({ issueNumber: complaints.issueNumber, createdAt: complaints.createdAt, journeyJson: complaints.journeyJson });
         return Response.json({ complaint: record }, { status: 201 });
       } catch (error) {
-        if (String(error).includes("UNIQUE") && attempt < 2) continue;
+        // SQLite raised "UNIQUE constraint failed"; Postgres raises
+        // "duplicate key value violates unique constraint".
+        const collision = /unique|duplicate key/i.test(String(error));
+        if (collision && attempt < 2) continue;
         throw error;
       }
     }

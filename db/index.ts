@@ -1,13 +1,19 @@
-import { env } from "cloudflare:workers";
-import { drizzle } from "drizzle-orm/d1";
+import { neon } from "@neondatabase/serverless";
+import { drizzle } from "drizzle-orm/neon-http";
 import * as schema from "./schema";
 
+/**
+ * Neon over HTTP: one round trip per query and no connection pool to exhaust,
+ * which is what serverless functions need. Replaces the Cloudflare D1 binding
+ * the app used before, since D1 only exists inside a Worker.
+ */
 export function getDb() {
-  if (!env.DB) {
+  const url = process.env.DATABASE_URL;
+  if (!url) {
     throw new Error(
-      "Cloudflare D1 binding `DB` is unavailable. Set the `d1` field in .openai/hosting.json to `DB` or let your control plane inject the real binding values before using the database."
+      "DATABASE_URL is not set. Add a Postgres connection string to the environment (Vercel project settings, or .env.local for development).",
     );
   }
 
-  return drizzle(env.DB, { schema });
+  return drizzle(neon(url), { schema });
 }
