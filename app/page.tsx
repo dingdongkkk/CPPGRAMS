@@ -1386,6 +1386,11 @@ function PortalPanelView({
         <ul className="portalPanelList">
           {content.items.map((item) => <li key={item}><span>✓</span>{item}</li>)}
         </ul>
+        {(panel === "contact" || panel === "help" || panel === "about") && (
+          <a className="portalSource" href={panel === "contact" ? "https://pgportal.gov.in/Home/ContactUs" : "https://pgportal.gov.in/Home/Faq"} target="_blank" rel="noreferrer">
+            ↗ {t.portalOfficialSource}
+          </a>
+        )}
         {panel === "help" && (
           <div className="portalPanelActions">
             <button className="secondary" onClick={() => { close(); openPanel("contact"); }}>
