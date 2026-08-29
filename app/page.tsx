@@ -37,6 +37,15 @@ import {
 } from "./icons";
 import ProcessCarousel from "./ProcessCarousel";
 import { DigiCitizenProfile, DigiDocument } from "./digilocker/data";
+import {
+  DashboardView,
+  type GrievanceRecord,
+  type AppealRecord,
+  type ActivityRecord,
+  type UserProfile,
+} from "./components/DashboardView";
+import { PostFillAuthModal } from "./components/PostFillAuthModal";
+import { calculateSla, getDepartmentOfficer } from "./lib/officerDirectory";
 
 type Screen =
   | "home"
@@ -66,16 +75,7 @@ type DashboardUpdate = {
   done: boolean;
   icon: string;
 };
-type DashboardComplaint = {
-  id: string;
-  subject: string;
-  department: string;
-  location: string;
-  status: string;
-  statusTone: "green" | "amber" | "blue";
-  filedOn: string;
-  updates: DashboardUpdate[];
-};
+type DashboardComplaint = GrievanceRecord;
 type Analysis = {
   department: string;
   category: string;
@@ -86,6 +86,18 @@ type Analysis = {
   urgency: "Critical" | "High" | "Medium" | "Low";
   urgencyReason: string;
   assignedOfficer: string;
+  officerName?: string;
+  officerDesignation?: string;
+  officerEmail?: string;
+  officerPhone?: string;
+  officerOffice?: string;
+  appellateOfficerName?: string;
+  appellateOfficerDesignation?: string;
+  appellateOfficerEmail?: string;
+  appellateOfficerPhone?: string;
+  slaDeadline?: string;
+  slaDays?: number;
+  publicExplanation?: string;
   emergencyWarning: boolean;
   source?: string;
 };
@@ -120,6 +132,20 @@ type TrackingRecord = {
   urgency: "Critical" | "High" | "Medium" | "Low";
   urgencyReason: string;
   assignedOfficer: string;
+  officerName?: string;
+  officerDesignation?: string;
+  officerEmail?: string;
+  officerPhone?: string;
+  officerOffice?: string;
+  appellateOfficerName?: string;
+  appellateOfficerDesignation?: string;
+  appellateOfficerEmail?: string;
+  appellateOfficerPhone?: string;
+  slaDeadline?: string;
+  slaDays?: number;
+  publicExplanation?: string;
+  description?: string;
+  journey?: DashboardUpdate[];
 };
 type SpeechResultEvent = {
   resultIndex: number;
@@ -310,6 +336,10 @@ export default function Home() {
   const [processRating, setProcessRating] = useState(0);
   const [portalPanel, setPortalPanel] = useState<PortalPanel>(null);
   const [dashboardComplaints, setDashboardComplaints] = useState<DashboardComplaint[]>([]);
+  const [dashboardAppeals, setDashboardAppeals] = useState<AppealRecord[]>([]);
+  const [activityLogs, setActivityLogs] = useState<ActivityRecord[]>([]);
+  const [authenticatedUser, setAuthenticatedUser] = useState<UserProfile | null>(null);
+  const [showPostAuthModal, setShowPostAuthModal] = useState(false);
   const [selectedDashboardId, setSelectedDashboardId] = useState("");
   const [dashboardLoading, setDashboardLoading] = useState(false);
   const [dashboardError, setDashboardError] = useState("");
@@ -494,54 +524,118 @@ export default function Home() {
     }
   }
 
-  async function submitGrievance() {
+  async function loadDashboardData() {
+    setDashboardLoading(true);
+    setDashboardError("");
+    try {
+      try {
+        const sessRes = await fetch("/api/auth/session");
+        if (sessRes.ok) {
+          const sessData = await sessRes.json();
+          if (sessData.user) {
+            setAuthenticatedUser(sessData.user);
+            setAccount(sessData.user.fullName || sessData.user.email);
+          }
+        }
+      } catch {}
+
+      const compRes = await fetch("/api/complaints?mine=1");
+      if (compRes.ok) {
+        const compData = await compRes.json();
+        if (compData.complaints) {
+          setDashboardComplaints(compData.complaints);
+        }
+      } else if (name) {
+        const compRes2 = await fetch(`/api/complaints?name=${encodeURIComponent(name)}`);
+        if (compRes2.ok) {
+          const compData2 = await compRes2.json();
+          if (compData2.complaints) setDashboardComplaints(compData2.complaints);
+        }
+      }
+
+      try {
+        const appRes = await fetch("/api/appeals");
+        if (appRes.ok) {
+          const appData = await appRes.json();
+          if (appData.appeals) setDashboardAppeals(appData.appeals);
+        }
+      } catch {}
+    } catch (err) {
+      setDashboardError(err instanceof Error ? err.message : "Failed to load dashboard");
+    } finally {
+      setDashboardLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (screen === "dashboard") {
+      loadDashboardData();
+    }
+  }, [screen, name]);
+
+  function submitGrievance() {
     if (!analysis) return;
-    if (name.trim().length < 2) {
-      setToast(t.tEnterName);
+    const isAuthed = !!authenticatedUser || digiVerified || (account && account.trim().length >= 2);
+    if (!isAuthed && (!name || name.trim().length < 2)) {
+      setShowPostAuthModal(true);
       return;
     }
+    executeSubmission(name || account || authenticatedUser?.fullName || "Citizen");
+  }
+
+  async function executeSubmission(filerName: string) {
+    if (!analysis) return;
     setSubmitting(true);
     try {
       const response = await fetch("/api/complaints", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          filerName: name,
+          filerName,
           department: analysis.department,
           category: analysis.category,
           location: analysis.location,
           urgency: analysis.urgency,
           urgencyReason: analysis.urgencyReason,
           assignedOfficer: analysis.assignedOfficer,
+          description,
         }),
       });
-      const result = (await response.json()) as {
-        complaint?: { issueNumber: string; journey?: DashboardUpdate[]; createdAt?: string };
-        error?: string;
-      };
+      const result = await response.json();
       if (!response.ok || !result.complaint) {
         throw new Error(result.error || "Could not file complaint");
       }
       localStorage.removeItem("jansetu-draft");
-      localStorage.setItem("jansetu-account", name.trim());
-      setAccount(name.trim());
+      localStorage.setItem("jansetu-account", filerName.trim());
+      setAccount(filerName.trim());
+      setName(filerName.trim());
       setGrievanceId(result.complaint.issueNumber);
-      const dashboardCase: DashboardComplaint = {
-        id: result.complaint.issueNumber,
-        subject: analysis.category,
-        department: analysis.department,
-        location: analysis.location,
-        status: "Complaint received",
-        statusTone: "green",
-        filedOn: new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
-        updates: result.complaint.journey || [],
-      };
-      setDashboardComplaints((items) => [dashboardCase, ...items]);
-      setSelectedDashboardId(dashboardCase.id);
+
+      const created = result.complaint;
+      setAnalysis((prev) =>
+        prev
+          ? {
+              ...prev,
+              officerName: created.officerName,
+              officerDesignation: created.officerDesignation,
+              officerEmail: created.officerEmail,
+              officerPhone: created.officerPhone,
+              officerOffice: created.officerOffice,
+              appellateOfficerName: created.appellateOfficerName,
+              appellateOfficerDesignation: created.appellateOfficerDesignation,
+              appellateOfficerEmail: created.appellateOfficerEmail,
+              appellateOfficerPhone: created.appellateOfficerPhone,
+              slaDeadline: created.slaDeadline,
+              slaDays: created.slaDays,
+            }
+          : null,
+      );
+
       setTrackingReadOnly(false);
       setStage(1);
       setScreen("track");
       setToast(fmt(t.tFiled, { id: result.complaint.issueNumber }));
+      loadDashboardData();
     } catch (error) {
       setToast(error instanceof Error ? error.message : t.tFileFail);
     } finally {
@@ -552,16 +646,55 @@ export default function Home() {
   async function trackComplaint() {
     setTrackingError("");
     setTrackingLoading(true);
+    const query = trackingIssue.trim().toUpperCase();
     try {
+      if (query.startsWith("AP-")) {
+        const response = await fetch(`/api/appeals?appeal=${encodeURIComponent(query)}`);
+        const result = await response.json();
+        if (!response.ok || !result.appeal) {
+          throw new Error(result.error || "No appeal record found with that registration number.");
+        }
+        const a = result.appeal;
+        setGrievanceId(a.appealNumber);
+        setTrackingReadOnly(true);
+        setStage(2);
+        setAnalysis({
+          department: a.department || "Appellate Authority Directorate",
+          category: `First Appeal: ${a.grounds || a.category || "Grievance Appeal"}`,
+          location: a.location || "Central Jurisdiction",
+          issueType: a.grounds || "First Appeal",
+          keyDetails: [
+            `Appeal Registration: ${a.appealNumber}`,
+            `Original Grievance: ${a.issueNumber || "—"}`,
+            `Status: ${a.status}`,
+            `Appellate Authority: ${a.officer || "Joint Secretary"}`,
+          ],
+          summary: `Appeal filed on ${a.createdAt}. Statement of facts: ${a.reason}`,
+          urgency: "High",
+          urgencyReason: "First Appeal under review by Joint Secretary / Director level Appellate Authority.",
+          assignedOfficer: a.officer || "Appellate Authority",
+          officerName: a.officer || "Smt. Sunita Verma, IAS",
+          officerDesignation: a.officerDesignation || "Joint Secretary & First Appellate Authority",
+          officerEmail: a.officerEmail || "appellate.authority@darpg.gov.in",
+          officerPhone: a.officerPhone || "+91-11-2338-9900",
+          officerOffice: a.officerOffice || "Appellate Directorate, CGO Complex, New Delhi",
+          slaDeadline: a.slaDeadline,
+          slaDays: 30,
+          emergencyWarning: false,
+          source: "tracking",
+        });
+        setShowTrackingLookup(false);
+        setScreen("track");
+        return;
+      }
+
       const response = await fetch(
-        `/api/complaints?issue=${encodeURIComponent(trackingIssue)}&name=${encodeURIComponent(trackingName)}`,
+        `/api/complaints?issue=${encodeURIComponent(query)}&name=${encodeURIComponent(trackingName)}`,
       );
-      const result = (await response.json()) as {
-        complaint?: TrackingRecord;
-        error?: string;
-      };
-      if (!response.ok || !result.complaint)
+      const result = await response.json();
+      if (!response.ok || !result.complaint) {
         throw new Error(result.error || "Complaint not found.");
+      }
       const record = result.complaint;
       setGrievanceId(record.issueNumber);
       setTrackingReadOnly(true);
@@ -576,6 +709,18 @@ export default function Home() {
         urgency: record.urgency,
         urgencyReason: record.urgencyReason,
         assignedOfficer: record.assignedOfficer,
+        officerName: record.officerName,
+        officerDesignation: record.officerDesignation,
+        officerEmail: record.officerEmail,
+        officerPhone: record.officerPhone,
+        officerOffice: record.officerOffice,
+        appellateOfficerName: record.appellateOfficerName,
+        appellateOfficerDesignation: record.appellateOfficerDesignation,
+        appellateOfficerEmail: record.appellateOfficerEmail,
+        appellateOfficerPhone: record.appellateOfficerPhone,
+        slaDeadline: record.slaDeadline,
+        slaDays: record.slaDays,
+        publicExplanation: record.publicExplanation,
         emergencyWarning: record.urgency === "Critical",
         source: "tracking",
       });
@@ -587,40 +732,6 @@ export default function Home() {
       setTrackingLoading(false);
     }
   }
-
-  useEffect(() => {
-    if (screen !== "dashboard") return;
-    if (name.trim().length < 2) {
-      setDashboardComplaints([]);
-      setDashboardError("");
-      return;
-    }
-    let cancelled = false;
-    setDashboardLoading(true);
-    fetch(`/api/complaints?name=${encodeURIComponent(name)}`)
-      .then(async (response) => {
-        const result = (await response.json()) as { complaints?: Array<{
-          issueNumber: string; category: string; department: string; location: string; status: string; createdAt: string; journey: DashboardUpdate[];
-        }>; error?: string };
-        if (!response.ok) throw new Error(result.error || "Could not load your complaints.");
-        if (cancelled) return;
-        const rows = result.complaints || [];
-        setDashboardComplaints(rows.map((row) => ({
-          id: row.issueNumber,
-          subject: row.category,
-          department: row.department,
-          location: row.location,
-          status: row.status,
-          statusTone: row.status === "Assigned to officer" ? "amber" : "blue",
-          filedOn: row.createdAt,
-          updates: row.journey || [],
-        })));
-        setSelectedDashboardId((current) => rows.some((row) => row.issueNumber === current) ? current : rows[0]?.issueNumber || "");
-      })
-      .catch((error) => { if (!cancelled) setDashboardError(error instanceof Error ? error.message : "Could not load your complaints."); })
-      .finally(() => { if (!cancelled) setDashboardLoading(false); });
-    return () => { cancelled = true; };
-  }, [screen, name]);
 
   function advanceStage() {
     if (stage < 4) {
@@ -1006,25 +1117,35 @@ export default function Home() {
 
   if (screen === "dashboard")
     return (
-      <main className="dashboardPage">
-        <Header
-          language={language}
-          openPicker={() => setShowPicker(true)}
-          onHome={() => setScreen("home")}
-          openDashboard={() => setScreen("dashboard")}
-        account={account}
-        />
-        {showPicker && <LanguagePicker active={language} onChoose={chooseLanguage} close={() => setShowPicker(false)} />}
-        <Dashboard
-          t={t}
-          complaints={dashboardComplaints}
-          selectedId={selectedDashboardId}
-          selectComplaint={setSelectedDashboardId}
-          loading={dashboardLoading}
-          error={dashboardError}
-          backHome={() => setScreen("home")}
-        />
-      </main>
+      <DashboardView
+        t={t}
+        user={authenticatedUser}
+        complaints={dashboardComplaints}
+        appeals={dashboardAppeals}
+        activityLogs={activityLogs}
+        loading={dashboardLoading}
+        error={dashboardError}
+        onRefresh={loadDashboardData}
+        onLodgeGrievance={() => setScreen("describe")}
+        onLodgePensionGrievance={() => {
+          setDetails((prev) => ({
+            ...prev,
+            requestedResolution: "Pension grievance redressal",
+          }));
+          setScreen("describe");
+        }}
+        onSignOut={async () => {
+          try {
+            await fetch("/api/auth/logout", { method: "POST" });
+          } catch {}
+          setAccount("");
+          setName("");
+          setAuthenticatedUser(null);
+          setScreen("home");
+        }}
+        onBackHome={() => setScreen("home")}
+        onOpenSpeakAssistant={() => setScreen("describe")}
+      />
     );
 
   return (
@@ -1218,6 +1339,18 @@ export default function Home() {
         <DigiDocModal
           documents={viewingDocs}
           close={() => setViewingDocs(null)}
+        />
+      )}
+      {showPostAuthModal && (
+        <PostFillAuthModal
+          filerName={name || account}
+          onClose={() => setShowPostAuthModal(false)}
+          onSuccess={(authName) => {
+            setShowPostAuthModal(false);
+            setAccount(authName);
+            setName(authName);
+            executeSubmission(authName);
+          }}
         />
       )}
     </main>
@@ -1724,73 +1857,7 @@ function Header({
   );
 }
 
-function Dashboard({
-  t,
-  complaints,
-  selectedId,
-  selectComplaint,
-  loading,
-  error,
-  backHome,
-}: {
-  t: Dict;
-  complaints: DashboardComplaint[];
-  selectedId: string;
-  selectComplaint: (id: string) => void;
-  loading: boolean;
-  error: string;
-  backHome: () => void;
-}) {
-  const selected = complaints.find((item) => item.id === selectedId) || complaints[0];
-  return (
-    <>
-      <section className="dashboardHero">
-        <div>
-          <button className="dashboardBack" onClick={backHome}><IconArrowLeft size={16} /> {t.returnHome}</button>
-          <p className="dashboardKicker">{t.dashboardKicker}</p>
-          <h1>{t.dashboardTitle}</h1>
-          <p>{t.dashboardBody}</p>
-        </div>
-        <div className="ministryBadge">
-          <img src="https://pgportal.gov.in/Images/iconHome/logo.png" alt="CPGRAMS logo" />
-          <div><b>{t.ministryName}</b><span>{t.ministrySub}</span></div>
-        </div>
-      </section>
-      {loading && <section className="dashboardEmpty"><span>◌</span><h2>{t.dashboardLoading}</h2><p>{t.dashboardLoadingBody}</p></section>}
-      {!loading && error && <section className="dashboardEmpty dashboardError"><span>!</span><h2>{t.dashboardCouldNotLoad}</h2><p>{error}</p></section>}
-      {!loading && !error && !selected && <section className="dashboardEmpty"><span><IconGrid size={22} /></span><h2>{t.dashboardEmptyTitle}</h2><p>{t.dashboardEmptyBody}</p><button className="primary compact" onClick={backHome}>{t.dashboardFileNew}<IconArrowRight size={16} /></button></section>}
-      {!loading && !error && selected && (
-      <main className="dashboardLayout">
-        <aside className="complaintListCard">
-          <div className="dashboardCardHeader"><div><span>{t.dashboardCasesKicker}</span><h2>{t.dashboardCasesTitle}</h2></div><b>{complaints.length}</b></div>
-          <div className="complaintList">
-            {complaints.map((item) => (
-              <button key={item.id} className={`complaintListItem ${item.id === selected.id ? "selected" : ""}`} onClick={() => selectComplaint(item.id)}>
-                <span className={`statusDot ${item.statusTone}`} />
-                <div><b>{item.subject}</b><small>{item.department}</small><em>{item.id} · {item.status}</em></div><i>›</i>
-              </button>
-            ))}
-          </div>
-          <button className="primary compact dashboardFileButton" onClick={backHome}>{t.dashboardFileNew}<IconArrowRight size={16} /></button>
-        </aside>
-        <section className="dashboardDetail">
-          <div className="detailTopline"><div><span>{t.dashboardTrackingKicker}</span><h2>{selected.subject}</h2><p>{selected.department} · {selected.location}</p></div><span className={`statusPill ${selected.statusTone}`}>{selected.status}</span></div>
-          <div className="detailMeta"><span>{t.dashboardFiledOn}<b>{selected.filedOn}</b></span><span>{t.dashboardCaseId}<b>{selected.id}</b></span></div>
-          <div className="amazonTimeline">
-            {selected.updates.map((update, i) => (
-              <div className={`amazonStep ${update.done ? "done" : "next"}`} key={`${update.title}-${i}`}>
-                <div className="amazonRail"><span>{update.icon}</span>{i < selected.updates.length - 1 && <i />}</div>
-                <div className="amazonContent"><div><h3>{update.title}</h3><time>{update.date}</time></div><p>{update.detail}</p>{update.done && i > 0 && <em>{t.dashboardVerifiedUpdate}</em>}</div>
-              </div>
-            ))}
-          </div>
-          <div className="journeySourceNote"><span><IconSpark size={14} />{t.dashboardJourneyKicker}</span><p>{t.dashboardJourneyBody}</p></div>
-        </section>
-      </main>
-      )}
-    </>
-  );
-}
+
 
 function PortalPanelView({
   panel,
@@ -3018,13 +3085,14 @@ function Track({
         )}
       </section>
       <aside className="caseAside">
-        <section className="officerCard">
-          <span>{t.officerRoleLabel}</span>
+        {/* Overlooking Officer Contact Card */}
+        <section className="officerCard primaryOfficer">
+          <span className="officerRoleBadge">{isAppeal ? "First Appellate Authority" : "Assigned Grievance Redress Officer"}</span>
           <div className="officer">
             <b>
               {isAppeal
-                ? "AM"
-                : analysis.assignedOfficer
+                ? "SV"
+                : (analysis.officerName || analysis.assignedOfficer)
                     .split(/\s+/)
                     .filter((part) => /^[A-Z]/.test(part))
                     .slice(0, 2)
@@ -3032,16 +3100,73 @@ function Track({
                     .join("") || "GO"}
             </b>
             <div>
-              <h3>{isAppeal ? "Anil Menon" : analysis.assignedOfficer}</h3>
-              <p>
-                {isAppeal
-                  ? t.escalationRole
-                  : `${urgencyLabel(t, analysis.urgency)} ${t.priorityWord} · ${analysis.category}`}
+              <h3>{analysis.officerName || (isAppeal ? "Smt. Sunita Verma, IAS" : analysis.assignedOfficer)}</h3>
+              <p className="officerDesig">
+                {analysis.officerDesignation || (isAppeal ? "Joint Secretary & First Appellate Authority" : "Nodal Grievance Redressal Officer")}
               </p>
             </div>
           </div>
-          <p className="contactRule">{t.contactRule}</p>
+          <div className="officerContactList" style={{ marginTop: "8px" }}>
+            <a
+              href={`mailto:${analysis.officerEmail || "nodal.grievance@gov.in"}`}
+              className="officerContactLink"
+            >
+              <IconMail size={13} />
+              {analysis.officerEmail || "nodal.grievance@gov.in"}
+            </a>
+            <a
+              href={`tel:${analysis.officerPhone || "+91-11-2338-4000"}`}
+              className="officerContactLink"
+            >
+              <IconPhone size={13} />
+              {analysis.officerPhone || "+91-11-2338-4000"}
+            </a>
+            {analysis.officerOffice && (
+              <div className="officerOfficeLocation">
+                <IconPin size={13} />
+                <span>{analysis.officerOffice}</span>
+              </div>
+            )}
+          </div>
         </section>
+
+        {/* SLA & Time to Fix Countdown Card */}
+        {(() => {
+          const sla = calculateSla(new Date().toISOString(), analysis.urgency, analysis.slaDeadline);
+          return (
+            <section className={`slaDossierBanner ${sla.isBreached ? "breached" : "normal"}`}>
+              <div className="slaTop">
+                <div className="slaTitle">
+                  <IconClock size={16} />
+                  <b>{sla.isBreached ? "SLA DEADLINE BREACHED" : `Resolution SLA: ${sla.slaDays} Days`}</b>
+                </div>
+                <span className={`slaBadge ${sla.isBreached ? "breached" : "active"}`}>
+                  {sla.timeRemainingText}
+                </span>
+              </div>
+              <div className="slaProgressTrack">
+                <div
+                  className={`slaProgressBar ${sla.isBreached ? "breached" : ""}`}
+                  style={{ width: `${sla.percentElapsed}%` }}
+                />
+              </div>
+              <p className="slaNoticeText">{sla.publicAccountabilityNotice}</p>
+              {sla.isBreached && (
+                <div className="breachActionNotice" style={{ marginTop: "4px" }}>
+                  <IconAlert size={15} />
+                  <div>
+                    <b>Mandatory Officer Explanation Required:</b>
+                    <span style={{ display: "block", marginTop: "2px" }}>
+                      The assigned officer is required to submit an official explanation to the Higher Appellate Authority and issue a public statement on the redressal delay.
+                    </span>
+                  </div>
+                </div>
+              )}
+            </section>
+          );
+        })()}
+
+        {/* Summary Card */}
         <section className="caseSummary">
           <span>{t.yourComplaint}</span>
           <h3>{analysis.category}</h3>
@@ -3064,10 +3189,6 @@ function Track({
               <dd>{analysis.assignedOfficer}</dd>
             </div>
           </dl>
-        </section>
-        <section className="slaCard">
-          <b><IconClock size={15} />{t.slaTitle}</b>
-          <p>{t.slaBody}</p>
         </section>
       </aside>
     </div>
