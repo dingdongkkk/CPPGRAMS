@@ -64,9 +64,13 @@
 .portalBack:hover { background: var(--mint); border-color: #a9bce4; }
 
 .portalBody {
+  /* max-width + auto margins already centre this. Adding viewport-based
+     side padding on top double-counted the gutter: with border-box the
+     padding ate into the 940px, so past ~990px viewport the content
+     column collapsed to a few words per line. */
   max-width: 940px;
   margin: 0 auto;
-  padding: 46px max(24px, calc((100vw - 940px) / 2)) 90px;
+  padding: 46px 24px 90px;
 }
 .portalPageKicker {
   margin: 0 0 12px;
