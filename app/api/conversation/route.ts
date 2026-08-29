@@ -73,6 +73,26 @@ type RequestBody = {
   captured?: Partial<Captured>;
   history?: Array<{ role: "assistant" | "user"; text: string }>;
   fallbackQuestions?: Partial<Record<keyof Captured, string>>;
+  /**
+   * The citizen's own cases, so the assistant can answer "what happened to
+   * my water complaint?" instead of only conducting the intake interview.
+   */
+  caseContext?: {
+    complaints?: Array<{
+      issueNumber: string;
+      category: string;
+      department: string;
+      status: string;
+      stage: number;
+      createdAt: string;
+    }>;
+    appeals?: Array<{
+      appealNumber: string;
+      issueNumber: string | null;
+      status: string;
+      officer: string;
+    }>;
+  };
 };
 
 const orderedFields: Array<keyof Captured> = [
@@ -135,11 +155,14 @@ Understand each answer even when it contains several facts. Update every field t
 
 The citizen said the complaint location is ${body.locationMatch === "same" ? "the same as their current GPS location, so do not ask State, district, block, panchayat, or locality again" : "different from their current location, so collect enough location detail to route it"}.
 
+The citizen's own filed grievances and appeals are supplied as citizensExistingCases. If they ask about the status of a case, an issue number, an appeal, or what happens next, answer from that data directly and do not treat the question as an answer to your interview — leave captured unchanged and repeat your outstanding question afterwards. Only state facts present in that data; if a case is not listed, say you cannot see it rather than guessing.
+
 Keep assistantMessage conversational and easy to hear aloud, normally one or two sentences. Use the citizen's chosen language and script. Do not translate their grievance into English in captured.description. Set complete true only when enough substance is present to prepare a meaningful grievance; optional administrative location levels may remain blank when the available location is still actionable. When complete, briefly summarize what you understood and ask the citizen to review it on screen.`,
         input: JSON.stringify({
           recentConversation: (body.history || []).slice(-10),
           latestCitizenAnswer: body.userText.trim(),
           existingCapturedData: body.captured || {},
+          citizensExistingCases: body.caseContext || {},
         }),
         text: {
           format: {

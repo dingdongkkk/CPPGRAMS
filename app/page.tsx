@@ -2380,13 +2380,15 @@ function Describe({
             <div><b>{t.modeTitle}</b><p>{t.modeBody}</p></div>
             <span>{t.modeBadge}</span>
           </div>
+          {/* Both modes are their own page and share one draft, so the
+              citizen can move between them without losing anything. */}
           <div className="filingModeCards">
-            <button className={filingMode === "ai" ? "selected" : ""} onClick={() => selectMode("ai")}>
+            <Link href="/file/assistant" className="filingModeCard">
               <span><IconSpark size={20} /></span><b>{t.modeAiTitle}</b><p>{t.modeAiBody}</p><em>{t.modeAiCta}</em>
-            </button>
-            <button className={filingMode === "manual" ? "selected" : ""} onClick={() => selectMode("manual")}>
+            </Link>
+            <Link href="/file/form" className="filingModeCard">
               <span><IconGrid size={20} /></span><b>{t.modeManualTitle}</b><p>{t.modeManualBody}</p><em>{t.modeManualCta}</em>
-            </button>
+            </Link>
           </div>
         </div>
 

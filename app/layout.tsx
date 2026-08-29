@@ -7,6 +7,7 @@ import "./security.css";
 import "./language.css";
 import "./institution.css";
 import "./portal.css";
+import "./filing.css";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
