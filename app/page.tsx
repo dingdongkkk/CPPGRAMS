@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   LANGUAGES,
@@ -31,6 +32,7 @@ import {
   IconPin,
   IconPlus,
   IconSpark,
+  IconUser,
   IconStop,
 } from "./icons";
 import ProcessCarousel from "./ProcessCarousel";
@@ -219,6 +221,10 @@ export default function Home() {
   // sees the picker flash before their own language loads.
   const [ready, setReady] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
+  // "Registered" means this device has a verified filer identity. The
+  // dashboard looks cases up by name, so it is meaningless — and misleading —
+  // before one exists.
+  const [account, setAccount] = useState("");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
@@ -279,6 +285,11 @@ export default function Home() {
     if (isLangCode(savedLanguage)) {
       setLanguage(savedLanguage);
       setLanguageChosen(true);
+    }
+    const savedAccount = localStorage.getItem("jansetu-account");
+    if (savedAccount) {
+      setAccount(savedAccount);
+      setName(savedAccount);
     }
     setReady(true);
     const params = new URLSearchParams(window.location.search);
@@ -399,6 +410,8 @@ export default function Home() {
         throw new Error(result.error || "Could not file complaint");
       }
       localStorage.removeItem("jansetu-draft");
+      localStorage.setItem("jansetu-account", name.trim());
+      setAccount(name.trim());
       setGrievanceId(result.complaint.issueNumber);
       const dashboardCase: DashboardComplaint = {
         id: result.complaint.issueNumber,
@@ -726,14 +739,14 @@ export default function Home() {
           openPicker={() => setShowPicker(true)}
           openPanel={setPortalPanel}
           openDashboard={() => setScreen("dashboard")}
+        account={account}
         />
         <nav className="portalNav" aria-label={t.portalNavLabel}>
           <button onClick={() => setPortalPanel("about")}>{t.portalAbout}</button>
-          <button onClick={() => setPortalPanel("process")}>{t.portalProcess}</button>
-          <button onClick={() => setPortalPanel("officers")}>{t.portalOfficers}</button>
-          <button onClick={() => setPortalPanel("help")}>{t.portalHelp}</button>
-          <button onClick={() => setPortalPanel("appeal-authority")}>{t.portalAppeal}</button>
-          <button onClick={() => setPortalPanel("signin")}>{t.portalSignin}</button>
+          <Link href="/redress-process">{t.portalProcess}</Link>
+          <Link href="/nodal-officers">{t.portalOfficers}</Link>
+          <Link href="/faqs">{t.portalHelp}</Link>
+          <Link href="/appeal-authority">{t.portalAppeal}</Link>
           <button onClick={() => setPortalPanel("sitemap")}>{t.portalSitemap}</button>
         </nav>
         <section className="homeHero">
@@ -786,28 +799,6 @@ export default function Home() {
               ))}
             </ol>
           </div>
-        </section>
-        <section className="loginStrip">
-          <div>
-            <span className="avatar">
-              {name.trim()
-                ? name
-                    .trim()
-                    .split(/\s+/)
-                    .slice(0, 2)
-                    .map((part) => part[0]?.toUpperCase())
-                    .join("")
-                : t.nameWord}
-            </span>
-            <label htmlFor="filerName">{t.filerName}</label>
-            <input
-              id="filerName"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder={t.filerNamePlaceholder}
-            />
-          </div>
-          <p><IconLock size={14} />{t.prototypeNote}</p>
         </section>
         <ProcessCarousel
           t={t}
@@ -900,6 +891,7 @@ export default function Home() {
           openPicker={() => setShowPicker(true)}
           onHome={() => setScreen("home")}
           openDashboard={() => setScreen("dashboard")}
+        account={account}
         />
         {showPicker && <LanguagePicker active={language} onChoose={chooseLanguage} close={() => setShowPicker(false)} />}
         <Dashboard
@@ -930,6 +922,7 @@ export default function Home() {
         openPicker={() => setShowPicker(true)}
         onHome={() => setScreen("home")}
         openDashboard={() => setScreen("dashboard")}
+        account={account}
       />
       {showPicker && (
         <LanguagePicker
@@ -1036,6 +1029,8 @@ export default function Home() {
           setAnalysis={setAnalysis}
           back={() => setScreen("describe")}
           submit={submitGrievance}
+          name={name}
+          setName={setName}
           t={t}
           details={details}
           submitting={submitting}
@@ -1394,12 +1389,15 @@ function Header({
   onHome,
   openPanel,
   openDashboard,
+  account,
 }: {
   language: LangCode;
   openPicker: () => void;
   onHome?: () => void;
   openPanel?: (panel: Exclude<PortalPanel, null>) => void;
   openDashboard?: () => void;
+  /** Non-empty once a grievance has been filed on this device. */
+  account?: string;
 }) {
   const t = getDict(language);
   const meta = getLanguage(language);
@@ -1426,13 +1424,10 @@ function Header({
           <small>{t.brandSub}</small>
         </span>
       </button>
+      {/* Right-hand cluster, in a fixed order: status, language, then the
+          account action. Sign in always sits last so it is in the same place
+          on every screen. */}
       <div className="headerRight">
-        {openDashboard && <button className="dashboardButton" onClick={openDashboard}><IconGrid size={15} />{t.dashboardLabel}</button>}
-        {openPanel && (
-          <button className="headerInfo" onClick={() => openPanel("contact")}>
-            {t.portalContact}
-          </button>
-        )}
         <span className="demoChip">{t.publicBeta}</span>
         <button
           className="languageButton"
@@ -1442,6 +1437,29 @@ function Header({
           <IconLanguages size={15} />
           <span lang={language}>{meta.native}</span>
         </button>
+        {account ? (
+          <button className="accountButton" onClick={openDashboard}>
+            <span className="accountAvatar" aria-hidden="true">
+              {account
+                .trim()
+                .split(/\s+/)
+                .slice(0, 2)
+                .map((part) => part[0]?.toUpperCase())
+                .join("")}
+            </span>
+            {t.dashboardLabel}
+          </button>
+        ) : (
+          openPanel && (
+            <button
+              className="signInButton"
+              onClick={() => openPanel("signin")}
+            >
+              <IconUser size={15} />
+              {t.portalSignin}
+            </button>
+          )
+        )}
       </div>
     </header>
   );
@@ -2081,7 +2099,11 @@ function Review({
   t,
   details,
   submitting,
+  name,
+  setName,
 }: {
+  name: string;
+  setName: (v: string) => void;
   analysis: Analysis;
   setAnalysis: (a: Analysis) => void;
   back: () => void;
@@ -2178,6 +2200,20 @@ function Review({
         onChange={(e) => setAnalysis({ ...analysis, summary: e.target.value })}
       />
       <div className="humanCheck">✓ {t.humanCheck}</div>
+      <div className="filerBlock">
+        <label htmlFor="filerName">{t.filerName}</label>
+        <input
+          id="filerName"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder={t.filerNamePlaceholder}
+          autoComplete="name"
+        />
+        <small>
+          <IconLock size={13} />
+          {t.prototypeNote}
+        </small>
+      </div>
       <div className="issueNumberPromise">
         <b># {t.promiseTitle}</b>
         <p>{t.promiseBody}</p>

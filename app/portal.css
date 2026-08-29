@@ -1,0 +1,395 @@
+/* ═══ Portal pages ═════════════════════════════════════════════════
+   Formerly modals. As routed pages they get room to breathe, a real
+   reading measure, and an entrance rather than a pop. */
+
+.portalBoot { min-height: 100vh; background: #fff; }
+
+.portalPage {
+  position: relative;
+  min-height: 100vh;
+  background:
+    radial-gradient(120% 60% at 50% 0%, #eef2fb 0%, #f8fafd 45%, #fff 100%);
+}
+
+.portalPageHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px max(24px, calc((100vw - 940px) / 2)) 18px;
+  border-bottom: 1px solid var(--rule);
+  background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(8px);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+.portalBrand {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  color: var(--chakra);
+  text-decoration: none;
+}
+.portalBrand > span {
+  display: block;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  line-height: 1.2;
+  padding-inline-start: 11px;
+  border-inline-start: 1px solid var(--rule);
+}
+.portalBrand small {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.portalBack {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 14px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  background: #fff;
+  color: var(--navy);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: background 0.15s, border-color 0.15s;
+}
+.portalBack:hover { background: var(--mint); border-color: #a9bce4; }
+
+.portalBody {
+  max-width: 940px;
+  margin: 0 auto;
+  padding: 46px max(24px, calc((100vw - 940px) / 2)) 90px;
+}
+.portalPageKicker {
+  margin: 0 0 12px;
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.11em;
+  color: var(--blue);
+}
+.portalBody h1 {
+  margin: 0 0 16px;
+  font-size: clamp(29px, 4vw, 44px);
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  max-width: 20ch;
+}
+.portalPageIntro {
+  margin: 0 0 40px;
+  max-width: 62ch;
+  color: #46536f;
+  font-size: 16.5px;
+  line-height: 1.68;
+}
+
+/* ── Entrance: a short stagger, disabled for reduced motion ─────── */
+@media (prefers-reduced-motion: no-preference) {
+  .reveal {
+    opacity: 0;
+    transform: translateY(12px);
+    animation: portalReveal 0.5s cubic-bezier(0.22, 0.8, 0.3, 1) forwards;
+    animation-delay: calc(var(--i, 0) * 65ms);
+  }
+}
+@keyframes portalReveal {
+  to { opacity: 1; transform: none; }
+}
+
+/* ── Process timeline ──────────────────────────────────────────── */
+.processTimeline { list-style: none; margin: 0; padding: 0; }
+.processStep {
+  position: relative;
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 20px;
+  padding-bottom: 30px;
+}
+.processStep::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 25px;
+  top: 46px;
+  bottom: 4px;
+  width: 2px;
+  background: linear-gradient(var(--line), transparent);
+}
+.processStep:last-child { padding-bottom: 0; }
+.processStep:last-child::before { display: none; }
+.processStep > b {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-md);
+  background: var(--navy);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+.processStep h2 {
+  margin: 12px 0 7px;
+  font-size: 19px;
+  letter-spacing: -0.02em;
+}
+.processStep p {
+  margin: 0;
+  max-width: 64ch;
+  color: #4d5a76;
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+/* ── Directory & search ────────────────────────────────────────── */
+.directoryMeta {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--rule);
+  font-size: 13px;
+}
+.directoryMeta span:first-child { font-weight: 800; color: var(--navy); }
+.directoryMeta span:last-child { color: var(--muted); }
+
+.directorySearch { display: block; margin: 24px 0 18px; }
+.directorySearch > span {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.directorySearch > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: #fff;
+  color: var(--muted);
+}
+.directorySearch > div:focus-within {
+  border-color: var(--navy);
+  box-shadow: 0 0 0 3px rgba(15, 42, 119, 0.1);
+}
+.directorySearch input {
+  flex: 1;
+  border: 0;
+  outline: 0;
+  padding: 13px 0;
+  font-size: 15px;
+  background: transparent;
+  color: var(--ink);
+}
+
+.officerDirectory {
+  border: 1px solid var(--rule);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  background: #fff;
+}
+.officerRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--rule);
+  transition: background 0.14s;
+}
+.officerRow:last-child { border-bottom: 0; }
+.officerRow:hover { background: #f7f9fd; }
+.officerRow b {
+  display: block;
+  font-size: 15px;
+  letter-spacing: -0.01em;
+}
+.officerRow strong {
+  display: block;
+  margin-top: 3px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--navy);
+}
+.officerRow span { font-size: 12px; color: var(--muted); }
+.officerContact { display: grid; gap: 5px; justify-items: end; }
+.officerContact a {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--navy);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+.officerContact a:hover { text-decoration: underline; }
+.directoryEmpty { margin: 0; padding: 26px 18px; color: var(--muted); font-size: 14px; }
+
+/* ── FAQ accordion ─────────────────────────────────────────────── */
+.faqList { display: grid; gap: 8px; }
+.faqItem {
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  background: #fff;
+  overflow: hidden;
+  transition: border-color 0.15s, background 0.15s;
+}
+.faqItem.open { border-color: #b3c4e8; background: #f7f9fd; }
+.faqItem > button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  background: none;
+  border: 0;
+  text-align: start;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+}
+/* Plus that rotates into a minus, rather than swapping glyphs. */
+.faqItem > button b {
+  position: relative;
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+}
+.faqItem > button b::before,
+.faqItem > button b::after {
+  content: "";
+  position: absolute;
+  inset-inline-start: 0;
+  top: 7px;
+  width: 16px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--navy);
+  transition: transform 0.22s cubic-bezier(0.22, 0.8, 0.3, 1);
+}
+.faqItem > button b::after { transform: rotate(90deg); }
+.faqItem.open > button b::after { transform: rotate(0deg); }
+.faqAnswer { padding: 0 18px 17px; }
+.faqAnswer p {
+  margin: 0;
+  max-width: 66ch;
+  color: #4d5a76;
+  font-size: 14.5px;
+  line-height: 1.68;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .faqItem.open .faqAnswer {
+    animation: faqOpen 0.26s cubic-bezier(0.22, 0.8, 0.3, 1);
+  }
+}
+@keyframes faqOpen {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: none; }
+}
+
+.faqCallout {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-top: 26px;
+  padding: 20px 22px;
+  border: 1px solid #e6d9b8;
+  border-inline-start: 3px solid var(--saffron);
+  border-radius: var(--r-lg);
+  background: #fdf7ec;
+}
+.faqCallout b { display: block; font-size: 15px; margin-bottom: 4px; }
+.faqCallout p { margin: 0; max-width: 54ch; font-size: 13.5px; color: #6a5a3c; line-height: 1.6; }
+.faqCallout a { text-decoration: none; }
+
+/* ── Appeal ────────────────────────────────────────────────────── */
+.appealRule {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 22px;
+  flex-wrap: wrap;
+  padding: 20px 22px;
+  margin-bottom: 22px;
+  border: 1px solid #e6d9b8;
+  border-radius: var(--r-lg);
+  background: #fdf7ec;
+}
+.appealRule b { display: block; font-size: 15px; margin-bottom: 5px; }
+.appealRule p { margin: 0; max-width: 58ch; font-size: 13.5px; color: #6a5a3c; line-height: 1.6; }
+.appealRule > span {
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #8a6d2f;
+  white-space: nowrap;
+}
+.appealDirectory {
+  border: 1px solid var(--rule);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  background: #fff;
+}
+.appealDirectory > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px 20px;
+  padding: 15px 18px;
+  border-bottom: 1px solid var(--rule);
+}
+.appealDirectory > div:last-child { border-bottom: 0; }
+.appealDirectory > div:hover { background: #f7f9fd; }
+.appealDirectory span { grid-column: 1; font-size: 12px; color: var(--muted); }
+.appealDirectory b { grid-column: 1; font-size: 15px; }
+.appealDirectory a {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--navy);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.portalSource {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 34px;
+  padding-top: 20px;
+  border-top: 1px solid var(--rule);
+  color: var(--navy);
+  font-size: 13.5px;
+  font-weight: 700;
+  text-decoration: none;
+}
+.portalSource:hover { text-decoration: underline; }
+
+@media (max-width: 640px) {
+  .portalBody { padding-top: 32px; padding-bottom: 60px; }
+  .processStep { grid-template-columns: 42px minmax(0, 1fr); gap: 14px; }
+  .processStep > b { width: 42px; height: 42px; font-size: 12px; }
+  .processStep::before { inset-inline-start: 20px; top: 38px; }
+  .officerContact { justify-items: start; }
+  .appealRule > span { font-size: 24px; }
+}

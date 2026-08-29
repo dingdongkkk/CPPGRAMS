@@ -384,3 +384,89 @@ textarea:focus-visible,
    In English the endonym is the product name, so the lockup read
    "JanSetu JanSetu". Hidden via :lang rather than a JS branch. */
 .brandText b em:lang(en) { display: none; }
+
+/* ── Filer identity, asked for where it is used ─────────────────────
+   Previously a strip floating on the home page between unrelated
+   sections. It belongs on the review step, immediately above Submit. */
+.filerBlock {
+  margin: 22px 0 18px;
+  padding: 18px 20px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-lg);
+  background: #f8fafd;
+}
+.filerBlock label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 800;
+}
+.filerBlock input {
+  width: 100%;
+  max-width: 380px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: #fff;
+  font-size: 15px;
+  color: var(--ink);
+}
+.filerBlock input:focus-visible { border-color: var(--navy); }
+.filerBlock small {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 11px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+/* ── Header account cluster ─────────────────────────────────────── */
+.signInButton,
+.accountButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  border-radius: var(--r-md);
+  font-size: 12.5px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.signInButton {
+  border: 1px solid var(--navy);
+  background: var(--navy);
+  color: #fff;
+}
+.signInButton:hover { background: var(--navy-deep); }
+.accountButton {
+  border: 1px solid var(--rule);
+  background: #fff;
+  color: var(--ink);
+  padding-inline-start: 7px;
+}
+.accountButton:hover { background: var(--mint); }
+.accountAvatar {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-sm);
+  background: var(--navy);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+/* Nav links now sit alongside nav buttons; keep them identical. */
+.portalNav a {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 11px;
+  border-radius: var(--r-sm);
+  color: #55607e;
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: none;
+}
+.portalNav a:hover { background: #e7eaf3; color: var(--navy); }
