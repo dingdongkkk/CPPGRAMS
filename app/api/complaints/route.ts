@@ -40,9 +40,18 @@ export async function POST(request: Request) {
       department?: string;
       category?: string;
       location?: string;
+      urgency?: string;
+      urgencyReason?: string;
+      assignedOfficer?: string;
     };
     const filerName = payload.filerName?.trim().replace(/\s+/g, " ") || "";
-    if (filerName.length < 2 || !payload.department || !payload.category) {
+    if (
+      filerName.length < 2 ||
+      !payload.department ||
+      !payload.category ||
+      !["Critical", "High", "Medium", "Low"].includes(payload.urgency || "") ||
+      !payload.assignedOfficer
+    ) {
       return Response.json({ error: "Name and complaint details are required." }, { status: 400 });
     }
 
@@ -58,6 +67,11 @@ export async function POST(request: Request) {
             department: payload.department,
             category: payload.category,
             location: payload.location || "Location not provided",
+            urgency: payload.urgency,
+            urgencyReason: payload.urgencyReason || "AI urgency assessment completed",
+            assignedOfficer: payload.assignedOfficer,
+            status: "Assigned to officer",
+            stage: 1,
           })
           .returning({ issueNumber: complaints.issueNumber, createdAt: complaints.createdAt });
         return Response.json({ complaint: record }, { status: 201 });
@@ -88,6 +102,9 @@ export async function GET(request: Request) {
         department: complaints.department,
         category: complaints.category,
         location: complaints.location,
+        urgency: complaints.urgency,
+        urgencyReason: complaints.urgencyReason,
+        assignedOfficer: complaints.assignedOfficer,
         status: complaints.status,
         stage: complaints.stage,
         createdAt: complaints.createdAt,

@@ -4,6 +4,7 @@ import "./globals.css";
 import "./experience.css";
 import "./voice-location.css";
 import "./security.css";
+import "./language.css";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",

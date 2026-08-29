@@ -10,8 +10,11 @@ export const complaints = sqliteTable(
     department: text("department").notNull(),
     category: text("category").notNull(),
     location: text("location").notNull(),
-    status: text("status").notNull().default("Filed"),
-    stage: integer("stage").notNull().default(0),
+    urgency: text("urgency").notNull().default("Medium"),
+    urgencyReason: text("urgency_reason").notNull().default("Standard public-service queue"),
+    assignedOfficer: text("assigned_officer").notNull().default("Department Grievance Officer"),
+    status: text("status").notNull().default("Assigned to officer"),
+    stage: integer("stage").notNull().default(1),
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   },
   (table) => [

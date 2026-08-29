@@ -1,6 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  LANGUAGES,
+  detectLanguage,
+  fmt,
+  getDict,
+  getLanguage,
+  isLangCode,
+  type Dict,
+  type LangCode,
+} from "./i18n";
 
 type Screen =
   | "home"
@@ -11,6 +21,17 @@ type Screen =
   | "appeal"
   | "appeal-track"
   | "closed";
+type PortalPanel =
+  | "about"
+  | "contact"
+  | "help"
+  | "sitemap"
+  | "officers"
+  | "process"
+  | "appeal-authority"
+  | "mobile"
+  | "signin"
+  | null;
 type Analysis = {
   department: string;
   category: string;
@@ -18,6 +39,10 @@ type Analysis = {
   issueType: string;
   keyDetails: string[];
   summary: string;
+  urgency: "Critical" | "High" | "Medium" | "Low";
+  urgencyReason: string;
+  assignedOfficer: string;
+  emergencyWarning: boolean;
   source?: string;
 };
 type GpsLocation = {
@@ -36,7 +61,6 @@ type ComplaintDetails = {
   startedOn: string;
   frequency: string;
   affectedPeople: string;
-  urgency: string;
   requestedResolution: string;
 };
 type TrackingRecord = {
@@ -47,6 +71,9 @@ type TrackingRecord = {
   status: string;
   stage: number;
   createdAt: string;
+  urgency: "Critical" | "High" | "Medium" | "Low";
+  urgencyReason: string;
+  assignedOfficer: string;
 };
 type SpeechResultEvent = {
   resultIndex: number;
@@ -65,31 +92,20 @@ type SpeechRecognitionLike = {
   onerror: ((event: { error: string }) => void) | null;
 };
 
-const voiceLanguages = [
-  ["auto", "Auto — device language"],
-  ["en-IN", "English (India)"],
-  ["hi-IN", "हिन्दी"],
-  ["bn-BD", "বাংলা (Bangladesh — recommended)"],
-  ["bn-IN", "বাংলা (India)"],
-  ["te-IN", "తెలుగు"],
-  ["mr-IN", "मराठी"],
-  ["ta-IN", "தமிழ்"],
+/**
+ * Speech-recognition options: every UI language first (so the voice language
+ * follows the language the citizen picked), then widely-spoken extras that the
+ * interface itself is not translated into yet.
+ */
+const extraVoiceLanguages = [
   ["gu-IN", "ગુજરાતી"],
-  ["kn-IN", "ಕನ್ನಡ"],
   ["ml-IN", "മലയാളം"],
   ["pa-IN", "ਪੰਜਾਬੀ"],
   ["ur-IN", "اردو"],
   ["or-IN", "ଓଡ଼ିଆ"],
   ["as-IN", "অসমীয়া"],
   ["ne-NP", "नेपाली"],
-  ["es-ES", "Español"],
-  ["fr-FR", "Français"],
-  ["de-DE", "Deutsch"],
-  ["ar-SA", "العربية"],
-  ["zh-CN", "中文"],
-  ["ja-JP", "日本語"],
-  ["ko-KR", "한국어"],
-  ["pt-BR", "Português"],
+  ["bn-BD", "বাংলা (Bangladesh)"],
 ] as const;
 
 const statesAndUTs = [
@@ -131,88 +147,37 @@ const statesAndUTs = [
   "Lakshadweep",
 ];
 
-const stages = [
-  {
-    title: "Filed",
-    hi: "दर्ज हुई",
-    detail: "Your complaint was received safely.",
-    sla: "Instant",
-  },
-  {
-    title: "Assigned to officer",
-    hi: "अधिकारी को सौंपी",
-    detail: "Priya Sharma is responsible for your case.",
-    sla: "Within 1 working day",
-  },
-  {
-    title: "Officer viewing",
-    hi: "अधिकारी देख रहे हैं",
-    detail: "The officer has opened your complaint and evidence.",
-    sla: "Within 2 working days",
-  },
-  {
-    title: "Action taken",
-    hi: "कार्रवाई हुई",
-    detail: "A field team has recorded an action on your case.",
-    sla: "Within 5 working days",
-  },
-  {
-    title: "Resolved",
-    hi: "समाधान बताया गया",
-    detail:
-      "The department says the issue is fixed. Your confirmation is required.",
-    sla: "Citizen confirmation",
-  },
-];
+/** Timeline stages, resolved against the active dictionary. */
+function buildStages(t: Dict) {
+  return [
+    { title: t.s1Title, detail: t.s1Detail, sla: t.s1Sla },
+    { title: t.s2Title, detail: t.s2Detail, sla: t.s2Sla },
+    { title: t.s3Title, detail: t.s3Detail, sla: t.s3Sla },
+    { title: t.s4Title, detail: t.s4Detail, sla: t.s4Sla },
+    { title: t.s5Title, detail: t.s5Detail, sla: t.s5Sla },
+  ];
+}
 
-const copy = {
-  en: {
-    describe: "Describe",
-    review: "Review",
-    track: "Track",
-    confirm: "Confirm",
-    start: "File a grievance",
-    existing: "Track an existing grievance",
-    what: "What happened?",
-    natural: "Write naturally, like you’re telling a neighbour.",
-    placeholder:
-      "Example: There has been no water supply in our lane for three days. We are in Shastri Nagar near the community centre.",
-    prepare: "Prepare my complaint",
-    saved: "Draft saved on this device",
-    back: "Back",
-    submit: "Submit grievance",
-    edit: "Edit description",
-    next: "Show next update",
-    fixed: "Yes, it is fixed",
-    notFixed: "No, it is not fixed",
-    appeal: "Submit appeal",
-  },
-  hi: {
-    describe: "समस्या बताएँ",
-    review: "जाँचें",
-    track: "स्थिति देखें",
-    confirm: "पुष्टि करें",
-    start: "शिकायत दर्ज करें",
-    existing: "पुरानी शिकायत देखें",
-    what: "क्या हुआ?",
-    natural: "जैसे किसी पड़ोसी को बताते हैं, वैसे लिखें।",
-    placeholder:
-      "उदाहरण: हमारे इलाके में तीन दिनों से पानी नहीं आया। हम शास्त्री नगर सामुदायिक केंद्र के पास रहते हैं।",
-    prepare: "मेरी शिकायत तैयार करें",
-    saved: "ड्राफ्ट इस डिवाइस पर सेव है",
-    back: "वापस",
-    submit: "शिकायत जमा करें",
-    edit: "विवरण बदलें",
-    next: "अगला अपडेट दिखाएँ",
-    fixed: "हाँ, समस्या ठीक हुई",
-    notFixed: "नहीं, समस्या ठीक नहीं हुई",
-    appeal: "अपील जमा करें",
-  },
-};
+/** Urgency comes back from the API in English; show it in the citizen's language. */
+function urgencyLabel(t: Dict, urgency: Analysis["urgency"]) {
+  return urgency === "Critical"
+    ? t.urgencyCritical
+    : urgency === "High"
+      ? t.urgencyHigh
+      : urgency === "Medium"
+        ? t.urgencyMedium
+        : t.urgencyLow;
+}
 
 export default function Home() {
   const [screen, setScreen] = useState<Screen>("home");
-  const [language, setLanguage] = useState<"en" | "hi">("en");
+  const [language, setLanguage] = useState<LangCode>("en");
+  const [languageChosen, setLanguageChosen] = useState(false);
+  // The saved language lives in localStorage, which is unavailable during SSR.
+  // Hold the first paint until we've read it, so a returning citizen never
+  // sees the picker flash before their own language loads.
+  const [ready, setReady] = useState(false);
+  const [showPicker, setShowPicker] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
@@ -234,7 +199,6 @@ export default function Home() {
     startedOn: "",
     frequency: "Ongoing",
     affectedPeople: "",
-    urgency: "Normal",
     requestedResolution: "",
   });
   const [permissionPrompt, setPermissionPrompt] = useState(true);
@@ -251,17 +215,27 @@ export default function Home() {
   const [trackingError, setTrackingError] = useState("");
   const [trackingLoading, setTrackingLoading] = useState(false);
   const [trackingReadOnly, setTrackingReadOnly] = useState(false);
+  const [resolutionFeedback, setResolutionFeedback] = useState<"resolved" | "not-resolved" | "">("");
+  const [processRating, setProcessRating] = useState(0);
+  const [portalPanel, setPortalPanel] = useState<PortalPanel>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const continueListeningRef = useRef(false);
   const voiceBaseRef = useRef("");
   const voiceFinalRef = useRef("");
-  const t = copy[language];
-  const hi = language === "hi";
+  const t = getDict(language);
+  const activeLanguage = getLanguage(language);
+  const stages = useMemo(() => buildStages(t), [t]);
 
   useEffect(() => {
     const draft = localStorage.getItem("jansetu-draft");
     if (draft) setDescription(draft);
+    const savedLanguage = localStorage.getItem("jansetu-lang");
+    if (isLangCode(savedLanguage)) {
+      setLanguage(savedLanguage);
+      setLanguageChosen(true);
+    }
+    setReady(true);
     const params = new URLSearchParams(window.location.search);
     if (
       params.get("digilocker") === "verified" ||
@@ -275,6 +249,12 @@ export default function Home() {
   useEffect(() => {
     if (description) localStorage.setItem("jansetu-draft", description);
   }, [description]);
+  // Keep the document in sync so screen readers and text selection follow suit.
+  useEffect(() => {
+    const meta = getLanguage(language);
+    document.documentElement.lang = language;
+    document.documentElement.dir = meta.dir;
+  }, [language]);
   useEffect(() => {
     if (!toast) return;
     const timer = setTimeout(() => setToast(""), 3600);
@@ -295,15 +275,11 @@ export default function Home() {
 
   async function prepareComplaint() {
     if (description.trim().length < 20) {
-      setToast(
-        hi
-          ? "कृपया थोड़ी और जानकारी दें।"
-          : "Please add a little more detail so we can route it correctly.",
-      );
+      setToast(t.tMoreDetail);
       return;
     }
     if (!selectedState && !gpsLocation?.state) {
-      setToast("Select your State/UT or use GPS so the complaint reaches the correct authority.");
+      setToast(t.tSelectState);
       return;
     }
     setLoading(true);
@@ -343,11 +319,7 @@ export default function Home() {
       );
       setScreen("review");
     } catch {
-      setToast(
-        hi
-          ? "अभी शिकायत तैयार नहीं हो सकी। फिर कोशिश करें।"
-          : "We couldn’t prepare this just now. Please try again.",
-      );
+      setToast(t.tPrepareFail);
     } finally {
       setLoading(false);
     }
@@ -356,7 +328,7 @@ export default function Home() {
   async function submitGrievance() {
     if (!analysis) return;
     if (name.trim().length < 2) {
-      setToast("Enter the complaint filer’s name before submitting.");
+      setToast(t.tEnterName);
       return;
     }
     setSubmitting(true);
@@ -369,6 +341,9 @@ export default function Home() {
           department: analysis.department,
           category: analysis.category,
           location: analysis.location,
+          urgency: analysis.urgency,
+          urgencyReason: analysis.urgencyReason,
+          assignedOfficer: analysis.assignedOfficer,
         }),
       });
       const result = (await response.json()) as {
@@ -381,19 +356,11 @@ export default function Home() {
       localStorage.removeItem("jansetu-draft");
       setGrievanceId(result.complaint.issueNumber);
       setTrackingReadOnly(false);
-      setStage(0);
+      setStage(1);
       setScreen("track");
-      setToast(
-        hi
-          ? `शिकायत दर्ज हुई। आपका नंबर ${result.complaint.issueNumber} है।`
-          : `Grievance filed. Save your issue number: ${result.complaint.issueNumber}`,
-      );
+      setToast(fmt(t.tFiled, { id: result.complaint.issueNumber }));
     } catch (error) {
-      setToast(
-        error instanceof Error
-          ? error.message
-          : "The complaint could not be filed. Please try again.",
-      );
+      setToast(error instanceof Error ? error.message : t.tFileFail);
     } finally {
       setSubmitting(false);
     }
@@ -423,6 +390,10 @@ export default function Home() {
         issueType: record.category,
         keyDetails: [`Filed on ${record.createdAt}`, `Current status: ${record.status}`],
         summary: `${record.category} complaint filed for ${record.location}.`,
+        urgency: record.urgency,
+        urgencyReason: record.urgencyReason,
+        assignedOfficer: record.assignedOfficer,
+        emergencyWarning: record.urgency === "Critical",
         source: "tracking",
       });
       setShowTrackingLookup(false);
@@ -439,7 +410,10 @@ export default function Home() {
       const next = stage + 1;
       setStage(next);
       setToast(
-        `Status update · ${stages[next].title}: ${stages[next].detail}`,
+        fmt(t.tStatusUpdate, {
+          title: stages[next].title,
+          detail: stages[next].detail,
+        }),
       );
       if (next === 4) setTimeout(() => setScreen("confirm"), 800);
     }
@@ -458,9 +432,7 @@ export default function Home() {
     const Recognition =
       speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
     if (!Recognition) {
-      setToast(
-        "Voice typing is not supported by this browser. Open this public link in Chrome, Edge or Safari and allow microphone access.",
-      );
+      setToast(t.tVoiceUnsupported);
       return;
     }
     const recognition = new Recognition();
@@ -468,7 +440,7 @@ export default function Home() {
     continueListeningRef.current = true;
     recognition.lang =
       voiceLanguage === "auto"
-        ? navigator.language || (hi ? "hi-IN" : "en-IN")
+        ? navigator.language || activeLanguage.speech
         : voiceLanguage;
     recognition.continuous = true;
     recognition.interimResults = true;
@@ -477,7 +449,7 @@ export default function Home() {
     voiceFinalRef.current = "";
     recognition.onstart = () => {
       setListening(true);
-      setToast(`Microphone is on · Speak in ${recognition.lang}`);
+      setToast(fmt(t.tMicOn, { lang: recognition.lang }));
     };
     recognition.onresult = (event) => {
       let interim = "";
@@ -496,10 +468,10 @@ export default function Home() {
       if (event.error !== "no-speech") continueListeningRef.current = false;
       const message =
         event.error === "not-allowed" || event.error === "service-not-allowed"
-          ? "Microphone permission is blocked. Allow microphone access in your browser’s site settings, then try again."
+          ? t.tMicBlocked
           : event.error === "no-speech"
-            ? "I couldn’t hear speech. Move closer to the microphone and try again."
-            : `Voice typing stopped (${event.error}). Please try again.`;
+            ? t.tNoSpeech
+            : fmt(t.tVoiceStopped, { error: event.error });
       setToast(message);
     };
     recognition.onend = () => {
@@ -518,15 +490,13 @@ export default function Home() {
       recognition.start();
     } catch {
       setListening(false);
-      setToast("The microphone is already starting. Please wait a moment.");
+      setToast(t.tMicStarting);
     }
   }
 
   function getGpsLocation() {
     if (!navigator.geolocation) {
-      setToast(
-        "GPS location is not supported on this device. You can enter the location manually after voice typing.",
-      );
+      setToast(t.tGpsUnsupported);
       return;
     }
     setLocating(true);
@@ -596,24 +566,30 @@ export default function Home() {
       if (!navigator.mediaDevices?.getUserMedia) throw new Error("unsupported");
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       stream.getTracks().forEach((track) => track.stop());
-      setToast(
-        "Microphone enabled. Now approve location if your browser asks.",
-      );
+      setToast(t.tMicEnabled);
     } catch {
-      setToast(
-        "Microphone was not enabled. You can allow it later from the voice button or browser site settings.",
-      );
+      setToast(t.tMicDenied);
     }
     getGpsLocation();
   }
 
+  function chooseLanguage(code: LangCode) {
+    setLanguage(code);
+    setLanguageChosen(true);
+    setShowPicker(false);
+    localStorage.setItem("jansetu-lang", code);
+    if (code !== language) {
+      setToast(fmt(getDict(code).tLanguageSet, { lang: getLanguage(code).native }));
+    }
+  }
+
   async function completeSecurityCheck() {
     if (!digiVerified) {
-      setToast("Verify with DigiLocker before continuing.");
+      setToast(t.tVerifyDigi);
       return;
     }
     if (!captchaToken) {
-      setToast("Complete the CAPTCHA before continuing.");
+      setToast(t.tVerifyCaptcha);
       return;
     }
     setSecurityLoading(true);
@@ -626,34 +602,55 @@ export default function Home() {
       if (!response.ok) throw new Error("captcha failed");
       setShowSecurityGate(false);
       setScreen("describe");
-      setToast("Identity and human check complete.");
+      setToast(t.tSecurityOk);
     } catch {
-      setToast("CAPTCHA verification failed or expired. Please try it again.");
+      setToast(t.tCaptchaFail);
       setCaptchaToken("");
     } finally {
       setSecurityLoading(false);
     }
   }
 
+  if (!ready)
+    return (
+      <div className="bootSplash" aria-hidden="true">
+        <span className="languageMark">ज</span>
+      </div>
+    );
+
+  if (!languageChosen)
+    return (
+      <LanguagePicker
+        active={language}
+        onChoose={chooseLanguage}
+        firstRun
+      />
+    );
+
   if (screen === "home")
     return (
       <main className="homePage">
-        <Header language={language} setLanguage={setLanguage} />
+        <Header
+          language={language}
+          openPicker={() => setShowPicker(true)}
+          openPanel={setPortalPanel}
+        />
+        <nav className="portalNav" aria-label={t.portalNavLabel}>
+          <button onClick={() => setPortalPanel("about")}>{t.portalAbout}</button>
+          <button onClick={() => setPortalPanel("process")}>{t.portalProcess}</button>
+          <button onClick={() => setPortalPanel("officers")}>{t.portalOfficers}</button>
+          <button onClick={() => setPortalPanel("help")}>{t.portalHelp}</button>
+          <button onClick={() => setPortalPanel("appeal-authority")}>{t.portalAppeal}</button>
+          <button onClick={() => setPortalPanel("signin")}>{t.portalSignin}</button>
+          <button onClick={() => setPortalPanel("sitemap")}>{t.portalSitemap}</button>
+        </nav>
         <section className="homeHero">
           <div className="homeCopy">
             <span className="servicePill">
-              <i /> सरल जन शिकायत सेवा · PUBLIC BETA
+              <i /> {t.servicePill} · {t.publicBeta}
             </span>
-            <h1>
-              {hi
-                ? "आपकी आवाज़। सही जगह। साफ़ जवाब।"
-                : "Your voice. The right desk. A clear answer."}
-            </h1>
-            <p>
-              {hi
-                ? "अपनी समस्या आसान भाषा में बताएँ। हम सही विभाग चुनने, शिकायत लिखने और हर कदम समझने में मदद करेंगे।"
-                : "Speak or write in your own language. We’ll help prepare the complaint, send it to the right office, and explain every step."}
-            </p>
+            <h1>{t.heroTitle}</h1>
+            <p>{t.heroBody}</p>
             <div className="homeActions">
               <button
                 className="primary compact"
@@ -670,45 +667,31 @@ export default function Home() {
               </button>
             </div>
             <div className="trustRow">
-              <span>🎙 बोलकर शिकायत करें</span>
-              <span>⌖ गाँव की जगह GPS से जोड़ें</span>
-              <span>文 अनेक भारतीय भाषाएँ</span>
+              <span>🎙 {t.trustVoice}</span>
+              <span>⌖ {t.trustGps}</span>
+              <span>文 {t.trustLanguages}</span>
             </div>
           </div>
           <div className="promiseCard">
             <div className="promiseTop">
-              <span>WHAT YOU CAN EXPECT</span>
-              <b>SAMPLE JOURNEY</b>
+              <span>{t.expectKicker}</span>
+              <b>{t.sampleJourney}</b>
             </div>
             <ol>
-              <li>
-                <b>1</b>
-                <div>
-                  <strong>बस बोलिए या लिखिए</strong>
-                  <p>विभाग का नाम जानना ज़रूरी नहीं।</p>
-                </div>
-              </li>
-              <li>
-                <b>2</b>
-                <div>
-                  <strong>पहले पढ़ें, फिर भेजें</strong>
-                  <p>हर जानकारी बदल सकते हैं।</p>
-                </div>
-              </li>
-              <li>
-                <b>3</b>
-                <div>
-                  <strong>स्थिति साफ़ देखें</strong>
-                  <p>अधिकारी, तारीख और समय-सीमा।</p>
-                </div>
-              </li>
-              <li>
-                <b>4</b>
-                <div>
-                  <strong>समाधान आप तय करें</strong>
-                  <p>समस्या बाकी हो तो अपील करें।</p>
-                </div>
-              </li>
+              {[
+                [t.step1Title, t.step1Body],
+                [t.step2Title, t.step2Body],
+                [t.step3Title, t.step3Body],
+                [t.step4Title, t.step4Body],
+              ].map(([title, body], i) => (
+                <li key={title}>
+                  <b>{i + 1}</b>
+                  <div>
+                    <strong>{title}</strong>
+                    <p>{body}</p>
+                  </div>
+                </li>
+              ))}
             </ol>
           </div>
         </section>
@@ -722,20 +705,44 @@ export default function Home() {
                     .slice(0, 2)
                     .map((part) => part[0]?.toUpperCase())
                     .join("")
-                : "नाम"}
+                : t.nameWord}
             </span>
-            <label htmlFor="filerName">Complaint filer’s name</label>
+            <label htmlFor="filerName">{t.filerName}</label>
             <input
               id="filerName"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="पूरा नाम / Full name"
+              placeholder={t.filerNamePlaceholder}
             />
           </div>
-          <p>🔒 This prototype uses no real personal or government data.</p>
+          <p>🔒 {t.prototypeNote}</p>
         </section>
+        <section className="qualitySignals" aria-label={t.qualitySignalsTitle}>
+          <div className="qualitySignalIntro">
+            <span className="signalIcon">◎</span>
+            <div>
+              <span className="signalKicker">{t.qualitySignalsKicker}</span>
+              <h2>{t.qualitySignalsTitle}</h2>
+              <p>{t.qualitySignalsBody}</p>
+            </div>
+          </div>
+          <div className="signalCards">
+            <div><b>01</b><span>{t.signalRefiles}</span></div>
+            <div><b>02</b><span>{t.signalBoilerplate}</span></div>
+            <div><b>03</b><span>{t.signalRootCauses}</span></div>
+          </div>
+          <p className="signalNote">{t.signalDemoNote}</p>
+        </section>
+        {showPicker && (
+          <LanguagePicker
+            active={language}
+            onChoose={chooseLanguage}
+            close={() => setShowPicker(false)}
+          />
+        )}
         {showSecurityGate && (
           <SecurityGate
+            t={t}
             digiVerified={digiVerified}
             captchaToken={captchaToken}
             setCaptchaToken={setCaptchaToken}
@@ -748,6 +755,7 @@ export default function Home() {
         )}
         {showTrackingLookup && (
           <TrackingLookup
+            t={t}
             issue={trackingIssue}
             setIssue={setTrackingIssue}
             name={trackingName}
@@ -759,6 +767,14 @@ export default function Home() {
               setTrackingError("");
             }}
             submit={trackComplaint}
+          />
+        )}
+        {portalPanel && (
+          <PortalPanelView
+            panel={portalPanel}
+            t={t}
+            close={() => setPortalPanel(null)}
+            openPanel={setPortalPanel}
           />
         )}
       </main>
@@ -777,9 +793,16 @@ export default function Home() {
       )}
       <Header
         language={language}
-        setLanguage={setLanguage}
+        openPicker={() => setShowPicker(true)}
         onHome={() => setScreen("home")}
       />
+      {showPicker && (
+        <LanguagePicker
+          active={language}
+          onChoose={chooseLanguage}
+          close={() => setShowPicker(false)}
+        />
+      )}
       {screen === "describe" && permissionPrompt && (
         <div
           className="permissionOverlay"
@@ -790,38 +813,27 @@ export default function Home() {
           <div className="permissionDialog">
             <span className="permissionIcon">◉</span>
             <div>
-              <em>OPTIONAL ACCESS</em>
-              <h2 id="permission-title">
-                Use voice and your current location?
-              </h2>
-              <p>
-                JanSetu can use your microphone to type your complaint and GPS
-                to add accurate location coordinates. Access happens only after
-                you approve the browser prompt.
-              </p>
+              <em>{t.permKicker}</em>
+              <h2 id="permission-title">{t.permTitle}</h2>
+              <p>{t.permBody}</p>
               <ul>
-                <li>
-                  🎙 Microphone: only while the listening button is active
-                </li>
-                <li>⌖ Location: captured once, then shown for your review</li>
+                <li>🎙 {t.permMic}</li>
+                <li>⌖ {t.permLoc}</li>
               </ul>
-              <small>
-                No audio is saved. Your exact location is not shown
-                in “nearby complaints.”
-              </small>
+              <small>{t.permNote}</small>
             </div>
             <div className="permissionActions">
               <button
                 className="secondary"
                 onClick={() => setPermissionPrompt(false)}
               >
-                Not now
+                {t.permNo}
               </button>
               <button
                 className="primary compact"
                 onClick={requestFeaturePermissions}
               >
-                Enable microphone & location
+                {t.permYes}
               </button>
             </div>
           </div>
@@ -829,53 +841,40 @@ export default function Home() {
       )}
       <section className="pageIntro">
         <div className="eyebrow">
-          <span className="liveDot" /> Citizen grievance service <b>PUBLIC BETA</b>
+          <span className="liveDot" /> {t.eyebrow} <b>{t.publicBeta}</b>
         </div>
         <h1>
           {screen === "describe"
-            ? hi
-              ? "अपनी समस्या बताइए।"
-              : "Tell us what went wrong."
+            ? t.introDescribeTitle
             : screen === "review"
-              ? hi
-                ? "जमा करने से पहले जाँचें।"
-                : "Check it before you send it."
+              ? t.introReviewTitle
               : screen === "confirm"
-                ? hi
-                  ? "क्या समस्या सच में ठीक हुई?"
-                  : "Is this actually fixed?"
+                ? t.introConfirmTitle
                 : screen === "appeal"
-                  ? hi
-                    ? "अपील में क्या बताना चाहेंगे?"
-                    : "Tell the escalation officer what remains."
+                  ? t.introAppealTitle
                   : screen === "closed"
-                    ? "Thank you for confirming."
-                    : hi
-                      ? "हर कदम साफ़ दिखाई देगा।"
-                      : "See exactly what’s happening."}
+                    ? t.introClosedTitle
+                    : t.introTrackTitle}
         </h1>
         <p>
           {screen === "describe"
-            ? hi
-              ? "विभाग ढूँढने की ज़रूरत नहीं। आसान भाषा में लिखें।"
-              : "No department hunting. Describe the issue in your own words."
+            ? t.introDescribeBody
             : screen === "review"
-              ? "We found the likely department and cleaned up your note. You can change anything."
+              ? t.introReviewBody
               : screen === "confirm"
-                ? "The department says the work is complete. Only you can close the case."
+                ? t.introConfirmBody
                 : screen === "appeal"
-                  ? "Your original complaint stays attached. Keep this short and specific."
+                  ? t.introAppealBody
                   : screen === "closed"
-                    ? "Your case is now closed, and your feedback has been recorded."
-                    : "No vague “under process” message—just named ownership, timing and the next step."}
+                    ? t.introClosedBody
+                    : t.introTrackBody}
         </p>
       </section>
-      <Journey progress={progress} language={language} />
+      <Journey progress={progress} t={t} />
 
       {screen === "describe" && (
         <Describe
           t={t}
-          hi={hi}
           description={description}
           setDescription={setDescription}
           loading={loading}
@@ -910,6 +909,7 @@ export default function Home() {
       {(screen === "track" || screen === "appeal-track") && analysis && (
         <Track
           analysis={analysis}
+          stages={stages}
           stage={stage}
           advance={advanceStage}
           grievanceId={grievanceId}
@@ -922,7 +922,10 @@ export default function Home() {
       {screen === "confirm" && (
         <Confirm
           grievanceId={grievanceId}
-          yes={() => setScreen("closed")}
+          yes={() => {
+            setResolutionFeedback("resolved");
+            setScreen("closed");
+          }}
           no={() => setScreen("appeal")}
           t={t}
         />
@@ -933,26 +936,102 @@ export default function Home() {
           setReason={setAppealReason}
           submit={() => {
             if (appealReason.length < 10) {
-              setToast("Please briefly explain what is still wrong.");
+              setToast(t.tAppealShort);
               return;
             }
             setScreen("appeal-track");
-            setToast(
-              "Appeal AP-JS-1047 filed and assigned to escalation officer Anil Menon.",
-            );
+            setToast(t.tAppealFiled);
           }}
           back={() => setScreen("confirm")}
           t={t}
         />
       )}
       {screen === "closed" && (
-        <Closed grievanceId={grievanceId} home={() => setScreen("home")} />
+        <Closed
+          t={t}
+          grievanceId={grievanceId}
+          home={() => setScreen("home")}
+          rating={processRating}
+          setRating={setProcessRating}
+          resolutionFeedback={resolutionFeedback}
+        />
       )}
     </main>
   );
 }
 
+/**
+ * First thing a citizen sees. Options are labelled in their own script, so the
+ * reader never has to understand English to find their language.
+ */
+function LanguagePicker({
+  active,
+  onChoose,
+  close,
+  firstRun,
+}: {
+  active: LangCode;
+  onChoose: (code: LangCode) => void;
+  close?: () => void;
+  firstRun?: boolean;
+}) {
+  // Only ever rendered on the client, so `navigator` is safe to read here.
+  // On a first run there is no saved choice yet, so start from the device.
+  const [highlighted, setHighlighted] = useState<LangCode>(() =>
+    firstRun ? detectLanguage(navigator.language) : active,
+  );
+  const t = getDict(highlighted);
+
+  return (
+    <div
+      className={`languageGate ${firstRun ? "fullPage" : "overlay"}`}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="language-title"
+    >
+      <section className="languageCard">
+        {close && (
+          <button className="gateClose" onClick={close} aria-label={t.closeWord}>
+            ×
+          </button>
+        )}
+        <span className="languageMark">{getLanguage(highlighted).mark}</span>
+        <p className="languageKicker">{t.pickKicker}</p>
+        <h1 id="language-title">{t.pickTitle}</h1>
+        <p className="languageIntro">{t.pickBody}</p>
+        <ul className="languageList">
+          {LANGUAGES.map((option) => (
+            <li key={option.code}>
+              <button
+                type="button"
+                className={option.code === highlighted ? "selected" : ""}
+                aria-pressed={option.code === highlighted}
+                onClick={() => setHighlighted(option.code)}
+                onDoubleClick={() => onChoose(option.code)}
+                lang={option.code}
+              >
+                <b>{option.native}</b>
+                <small>{option.english}</small>
+                <i aria-hidden="true">✓</i>
+              </button>
+            </li>
+          ))}
+        </ul>
+        <button
+          className="primary languageContinue"
+          onClick={() => onChoose(highlighted)}
+        >
+          {t.pickContinue}
+          <span>→</span>
+        </button>
+        <small className="languageFooter">{t.pickFooter}</small>
+      </section>
+    </div>
+  );
+}
+
 function TrackingLookup({
+  t,
   issue,
   setIssue,
   name,
@@ -962,6 +1041,7 @@ function TrackingLookup({
   close,
   submit,
 }: {
+  t: Dict;
   issue: string;
   setIssue: (value: string) => void;
   name: string;
@@ -974,14 +1054,12 @@ function TrackingLookup({
   return (
     <div className="trackingOverlay" role="dialog" aria-modal="true" aria-labelledby="tracking-title">
       <section className="trackingLookup">
-        <button className="gateClose" onClick={close} aria-label="Close tracking lookup">×</button>
+        <button className="gateClose" onClick={close} aria-label={t.closeWord}>×</button>
         <span className="trackingIcon">#</span>
-        <p className="trackingKicker">शिकायत की स्थिति · TRACK COMPLAINT</p>
-        <h2 id="tracking-title">Enter your issue number</h2>
-        <p className="trackingIntro">
-          Anyone helping the filer can check the status using the issue number and the filer’s exact name.
-        </p>
-        <label htmlFor="trackingIssue">Issue number / शिकायत संख्या</label>
+        <p className="trackingKicker">{t.tlKicker}</p>
+        <h2 id="tracking-title">{t.tlTitle}</h2>
+        <p className="trackingIntro">{t.tlIntro}</p>
+        <label htmlFor="trackingIssue">{t.tlIssueLabel}</label>
         <input
           id="trackingIssue"
           value={issue}
@@ -989,12 +1067,12 @@ function TrackingLookup({
           placeholder="JS-2026-ABCDE-12345"
           autoComplete="off"
         />
-        <label htmlFor="trackingName">Filer’s full name / शिकायतकर्ता का नाम</label>
+        <label htmlFor="trackingName">{t.tlNameLabel}</label>
         <input
           id="trackingName"
           value={name}
           onChange={(event) => setName(event.target.value)}
-          placeholder="Use the same name entered while filing"
+          placeholder={t.tlNamePlaceholder}
           autoComplete="name"
         />
         {error && <p className="trackingError" role="alert">{error}</p>}
@@ -1003,17 +1081,16 @@ function TrackingLookup({
           disabled={loading || issue.trim().length < 10 || name.trim().length < 2}
           onClick={submit}
         >
-          {loading ? "Checking…" : "Track complaint / स्थिति देखें"}<span>→</span>
+          {loading ? t.checking : t.tlButton}<span>→</span>
         </button>
-        <small className="trackingPrivacy">
-          For privacy, tracking shows status and routing only. Complaint text and evidence are not displayed.
-        </small>
+        <small className="trackingPrivacy">{t.tlPrivacy}</small>
       </section>
     </div>
   );
 }
 
 function SecurityGate({
+  t,
   digiVerified,
   captchaToken,
   setCaptchaToken,
@@ -1023,6 +1100,7 @@ function SecurityGate({
   close,
   complete,
 }: {
+  t: Dict;
   digiVerified: boolean;
   captchaToken: string;
   setCaptchaToken: (v: string) => void;
@@ -1040,45 +1118,40 @@ function SecurityGate({
       aria-labelledby="security-title"
     >
       <section className="securityGate">
-        <button className="gateClose" onClick={close} aria-label="Close">
+        <button className="gateClose" onClick={close} aria-label={t.closeWord}>
           ×
         </button>
         <div className="securityHeading">
           <span>✓</span>
           <div>
-            <em>SECURE FILING</em>
-            <h2 id="security-title">Verify before filing</h2>
-            <p>
-              Two quick checks protect your identity and stop automated spam.
-            </p>
+            <em>{t.secKicker}</em>
+            <h2 id="security-title">{t.secTitle}</h2>
+            <p>{t.secBody}</p>
           </div>
         </div>
         <div className={`securityStep ${digiVerified ? "complete" : ""}`}>
           <span className="securityNumber">{digiVerified ? "✓" : "1"}</span>
           <div>
             <div className="securityStepTitle">
-              <b>DigiLocker identity verification</b>
-              <em>{digiVerified ? "VERIFIED" : "REQUIRED"}</em>
+              <b>{t.secStep1Title}</b>
+              <em>{digiVerified ? t.secVerified : t.secRequired}</em>
             </div>
-            <p>
-              You will be redirected to DigiLocker. JanSetu never asks for or
-              stores your DigiLocker password.
-            </p>
+            <p>{t.secStep1Body}</p>
             {digiVerified ? (
               <div className="verifiedIdentity">
-                <b>✓ Identity verified</b>
+                <b>✓ {t.secVerifiedOk}</b>
                 <small>
                   {captchaMode === "demo"
-                    ? "Prototype identity check · no real personal data"
-                    : "Verified securely through DigiLocker"}
+                    ? t.secDemoIdentity
+                    : t.secLiveIdentity}
                 </small>
               </div>
             ) : (
               <a className="digiButton" href="/api/digilocker/start">
                 <span className="digiMark">D</span>
                 <span>
-                  Verify with DigiLocker
-                  <small>Secure government identity service</small>
+                  {t.digiVerify}
+                  <small>{t.digiVerifySub}</small>
                 </span>
                 <b>→</b>
               </a>
@@ -1089,28 +1162,22 @@ function SecurityGate({
           <span className="securityNumber">{captchaToken ? "✓" : "2"}</span>
           <div>
             <div className="securityStepTitle">
-              <b>Human verification</b>
-              <em>{captchaToken ? "COMPLETE" : "REQUIRED"}</em>
+              <b>{t.secStep2Title}</b>
+              <em>{captchaToken ? t.secComplete : t.secRequired}</em>
             </div>
-            <p>
-              Complete the privacy-friendly CAPTCHA. The answer is checked
-              securely on the server.
-            </p>
+            <p>{t.secStep2Body}</p>
             <CaptchaWidget onToken={setCaptchaToken} onMode={setCaptchaMode} />
             <small className="modeNote">
-              {captchaMode === "demo"
-                ? "Prototype CAPTCHA configuration · production keys required for a real rollout"
-                : "Live Cloudflare Turnstile protection"}
+              {captchaMode === "demo" ? t.secDemoCaptcha : t.secLiveCaptcha}
             </small>
           </div>
         </div>
         <div className="securityPrivacy">
           <span>🔒</span>
           <p>
-            <b>Privacy first</b>
+            <b>{t.secPrivacyTitle}</b>
             <br />
-            Only verification status is used for this prototype. No Aadhaar
-            number, documents, or DigiLocker credentials are stored.
+            {t.secPrivacyBody}
           </p>
         </div>
         <button
@@ -1118,7 +1185,7 @@ function SecurityGate({
           disabled={!digiVerified || !captchaToken || loading}
           onClick={complete}
         >
-          {loading ? "Checking…" : "Continue to complaint"}
+          {loading ? t.checking : t.secContinue}
           <span>→</span>
         </button>
       </section>
@@ -1188,49 +1255,152 @@ function CaptchaWidget({
 
 function Header({
   language,
-  setLanguage,
+  openPicker,
   onHome,
+  openPanel,
 }: {
-  language: "en" | "hi";
-  setLanguage: (l: "en" | "hi") => void;
+  language: LangCode;
+  openPicker: () => void;
   onHome?: () => void;
+  openPanel?: (panel: Exclude<PortalPanel, null>) => void;
 }) {
-  const hi = language === "hi";
+  const t = getDict(language);
+  const meta = getLanguage(language);
   return (
     <header className="siteHeader">
       <button
         className="brand brandButton"
         onClick={onHome}
-        aria-label="JanSetu home"
+        aria-label={t.homeAria}
       >
-        <span className="brandMark">ज</span>
+        <span className="brandMark">{meta.mark}</span>
         <span>
-          JanSetu <small>जनसेतु</small>
+          JanSetu <small>{meta.brand}</small>
         </span>
       </button>
       <div className="headerRight">
-        <span className="demoChip">PUBLIC BETA</span>
+        {openPanel && (
+          <button className="headerInfo" onClick={() => openPanel("contact")}>
+            {t.portalContact}
+          </button>
+        )}
+        <span className="demoChip">{t.publicBeta}</span>
         <button
           className="languageButton"
-          onClick={() => setLanguage(hi ? "en" : "hi")}
+          onClick={openPicker}
+          aria-label={t.languageCta}
         >
-          अ / A&nbsp;&nbsp; {hi ? "English" : "हिन्दी"}
+          <i aria-hidden="true">⟳</i>
+          <span lang={language}>{meta.native}</span>
         </button>
       </div>
     </header>
   );
 }
-function Journey({
-  progress,
-  language,
+
+function PortalPanelView({
+  panel,
+  t,
+  close,
+  openPanel,
 }: {
-  progress: number;
-  language: "en" | "hi";
+  panel: Exclude<PortalPanel, null>;
+  t: Dict;
+  close: () => void;
+  openPanel: (panel: PortalPanel) => void;
 }) {
-  const labels =
-    language === "hi"
-      ? ["समस्या बताएँ", "जाँचें", "स्थिति देखें", "पुष्टि करें"]
-      : ["Describe", "Review", "Track", "Confirm"];
+  const content = {
+    about: {
+      icon: "◎",
+      kicker: t.portalAboutKicker,
+      title: t.portalAboutTitle,
+      body: t.portalAboutBody,
+      items: [t.portalAboutItem1, t.portalAboutItem2, t.portalAboutItem3],
+    },
+    contact: {
+      icon: "☎",
+      kicker: t.portalContactKicker,
+      title: t.portalContactTitle,
+      body: t.portalContactBody,
+      items: [t.portalContactItem1, t.portalContactItem2, t.portalContactItem3],
+    },
+    help: {
+      icon: "?",
+      kicker: t.portalHelpKicker,
+      title: t.portalHelpTitle,
+      body: t.portalHelpBody,
+      items: [t.portalHelpItem1, t.portalHelpItem2, t.portalHelpItem3],
+    },
+    sitemap: {
+      icon: "⌘",
+      kicker: t.portalSitemapKicker,
+      title: t.portalSitemapTitle,
+      body: t.portalSitemapBody,
+      items: [t.portalSitemapItem1, t.portalSitemapItem2, t.portalSitemapItem3],
+    },
+    officers: {
+      icon: "◌",
+      kicker: t.portalOfficersKicker,
+      title: t.portalOfficersTitle,
+      body: t.portalOfficersBody,
+      items: [t.portalOfficersItem1, t.portalOfficersItem2, t.portalOfficersItem3],
+    },
+    process: {
+      icon: "↗",
+      kicker: t.portalProcessKicker,
+      title: t.portalProcessTitle,
+      body: t.portalProcessBody,
+      items: [t.portalProcessItem1, t.portalProcessItem2, t.portalProcessItem3],
+    },
+    "appeal-authority": {
+      icon: "↑",
+      kicker: t.portalAppealKicker,
+      title: t.portalAppealTitle,
+      body: t.portalAppealBody,
+      items: [t.portalAppealItem1, t.portalAppealItem2, t.portalAppealItem3],
+    },
+    mobile: {
+      icon: "▣",
+      kicker: t.portalMobileKicker,
+      title: t.portalMobileTitle,
+      body: t.portalMobileBody,
+      items: [t.portalMobileItem1, t.portalMobileItem2, t.portalMobileItem3],
+    },
+    signin: {
+      icon: "→",
+      kicker: t.portalSigninKicker,
+      title: t.portalSigninTitle,
+      body: t.portalSigninBody,
+      items: [t.portalSigninItem1, t.portalSigninItem2, t.portalSigninItem3],
+    },
+  }[panel];
+
+  return (
+    <div className="portalOverlay" role="dialog" aria-modal="true" aria-labelledby="portal-panel-title">
+      <section className="portalPanel">
+        <button className="gateClose" onClick={close} aria-label={t.closeWord}>×</button>
+        <span className="portalPanelIcon">{content.icon}</span>
+        <p className="portalPanelKicker">{content.kicker}</p>
+        <h2 id="portal-panel-title">{content.title}</h2>
+        <p className="portalPanelBody">{content.body}</p>
+        <ul className="portalPanelList">
+          {content.items.map((item) => <li key={item}><span>✓</span>{item}</li>)}
+        </ul>
+        {panel === "help" && (
+          <div className="portalPanelActions">
+            <button className="secondary" onClick={() => { close(); openPanel("contact"); }}>
+              {t.portalContact}
+            </button>
+            <button className="primary compact" onClick={close}>{t.closeWord}</button>
+          </div>
+        )}
+        {panel !== "help" && <button className="primary compact portalPanelButton" onClick={close}>{t.closeWord}</button>}
+      </section>
+    </div>
+  );
+}
+function Journey({ progress, t }: { progress: number; t: Dict }) {
+  const labels = [t.jDescribe, t.jReview, t.jTrack, t.jConfirm];
   return (
     <nav className="journey" aria-label="Grievance journey">
       {labels.map((label, i) => (
@@ -1246,7 +1416,6 @@ function Journey({
 
 function Describe({
   t,
-  hi,
   description,
   setDescription,
   loading,
@@ -1266,8 +1435,7 @@ function Describe({
   setFiles,
   fileRef,
 }: {
-  t: typeof copy.en;
-  hi: boolean;
+  t: Dict;
   description: string;
   setDescription: (v: string) => void;
   loading: boolean;
@@ -1290,7 +1458,7 @@ function Describe({
   return (
     <div className="contentGrid">
       <section className="formCard">
-        <div className="stepLabel">STEP 1 OF 4</div>
+        <div className="stepLabel">{t.stepLabel}</div>
         <h2>{t.what}</h2>
         <p className="muted">{t.natural}</p>
         <div className="voicePanel">
@@ -1298,19 +1466,9 @@ function Describe({
             <div>
               <span className={`micOrb ${listening ? "active" : ""}`}>●</span>
               <div>
-                <b>
-                  {listening
-                    ? hi
-                      ? "सुन रहा है—अब बोलिए"
-                      : "Listening—speak now"
-                    : hi
-                      ? "अपनी भाषा में बोलें"
-                      : "Speak in your language"}
-                </b>
+                <b>{listening ? t.voiceListening : t.voiceIdle}</b>
                 <small>
-                  {listening
-                    ? "Tap stop when you finish"
-                    : "Your speech appears in the box below"}
+                  {listening ? t.voiceListeningSub : t.voiceIdleSub}
                 </small>
               </div>
             </div>
@@ -1318,29 +1476,31 @@ function Describe({
               className={listening ? "stopVoice" : "startVoice"}
               onClick={startVoice}
             >
-              {listening ? "■ Stop" : "🎙 Start voice"}
+              {listening ? `■ ${t.voiceStop}` : `🎙 ${t.voiceStart}`}
             </button>
           </div>
-          <label htmlFor="voice-language">Voice language</label>
+          <label htmlFor="voice-language">{t.voiceLangLabel}</label>
           <select
             id="voice-language"
             value={voiceLanguage}
             onChange={(e) => setVoiceLanguage(e.target.value)}
             disabled={listening}
           >
-            {voiceLanguages.map(([value, label]) => (
+            <option value="auto">{t.voiceAuto}</option>
+            {LANGUAGES.map((option) => (
+              <option key={option.speech} value={option.speech}>
+                {option.native} — {option.english}
+              </option>
+            ))}
+            {extraVoiceLanguages.map(([value, label]) => (
               <option key={value} value={value}>
                 {label}
               </option>
             ))}
           </select>
-          <p>
-            Choose any listed language, or “Auto” to use your device language.
-          </p>
+          <p>{t.voiceLangHint}</p>
         </div>
-        <label htmlFor="issue">
-          {hi ? "अपनी समस्या बताएँ" : "Describe your problem"}
-        </label>
+        <label htmlFor="issue">{t.describeLabel}</label>
         <textarea
           id="issue"
           value={description}
@@ -1350,65 +1510,65 @@ function Describe({
         />
         <div className="textareaMeta">
           <span className={listening ? "recordingStatus" : ""}>
-            ● {listening ? "Live transcription active" : "Voice ready"}
+            ● {listening ? t.liveTranscription : t.voiceReady}
           </span>
           <span>{description.length} / 2,000</span>
         </div>
         <div className="structuredFields">
           <div className="sectionHeading">
             <div>
-              <b>Complaint details</b>
-              <p>These fields help the authority act without asking you again.</p>
+              <b>{t.detailsTitle}</b>
+              <p>{t.detailsBody}</p>
             </div>
-            <span>AI GUIDED</span>
+            <span>{t.aiGuided}</span>
           </div>
           <div className="detailsGrid">
             <label>
-              State / Union Territory <em>Required</em>
+              {t.fState} <em>{t.requiredWord}</em>
               <select
                 value={selectedState}
                 onChange={(e) => setSelectedState(e.target.value)}
               >
-                <option value="">Select State/UT</option>
+                <option value="">{t.selectState}</option>
                 {statesAndUTs.map((state) => (
                   <option key={state} value={state}>{state}</option>
                 ))}
               </select>
             </label>
             <label>
-              जिला / District
+              {t.fDistrict}
               <input
                 value={details.district}
                 onChange={(e) => setDetails({ ...details, district: e.target.value })}
-                placeholder="जैसे गया / e.g. Gaya"
+                placeholder={t.phDistrict}
               />
             </label>
             <label>
-              ब्लॉक या तहसील / Block or tehsil
+              {t.fBlock}
               <input
                 value={details.blockTehsil}
                 onChange={(e) => setDetails({ ...details, blockTehsil: e.target.value })}
-                placeholder="अपने ब्लॉक या तहसील का नाम"
+                placeholder={t.phBlock}
               />
             </label>
             <label>
-              ग्राम पंचायत / Gram panchayat
+              {t.fPanchayat}
               <input
                 value={details.gramPanchayat}
                 onChange={(e) => setDetails({ ...details, gramPanchayat: e.target.value })}
-                placeholder="पंचायत का नाम"
+                placeholder={t.phPanchayat}
               />
             </label>
             <label>
-              गाँव, वार्ड या टोला / Village, ward or hamlet
+              {t.fVillage}
               <input
                 value={details.locality}
                 onChange={(e) => setDetails({ ...details, locality: e.target.value })}
-                placeholder="गाँव, वार्ड, टोला या पास की पहचान"
+                placeholder={t.phVillage}
               />
             </label>
             <label>
-              When did it start?
+              {t.fStarted}
               <input
                 type="date"
                 value={details.startedOn}
@@ -1416,43 +1576,32 @@ function Describe({
               />
             </label>
             <label>
-              How often?
+              {t.fFrequency}
               <select
                 value={details.frequency}
                 onChange={(e) => setDetails({ ...details, frequency: e.target.value })}
               >
-                <option>Ongoing</option>
-                <option>Every day</option>
-                <option>Intermittent</option>
-                <option>One-time incident</option>
+                <option value="Ongoing">{t.freqOngoing}</option>
+                <option value="Every day">{t.freqDaily}</option>
+                <option value="Intermittent">{t.freqIntermittent}</option>
+                <option value="One-time incident">{t.freqOneTime}</option>
               </select>
             </label>
             <label>
-              People affected
+              {t.fAffected}
               <input
                 inputMode="numeric"
                 value={details.affectedPeople}
                 onChange={(e) => setDetails({ ...details, affectedPeople: e.target.value })}
-                placeholder="e.g. 25 households"
+                placeholder={t.phAffected}
               />
             </label>
-            <label>
-              Urgency
-              <select
-                value={details.urgency}
-                onChange={(e) => setDetails({ ...details, urgency: e.target.value })}
-              >
-                <option>Normal</option>
-                <option>Urgent — essential service stopped</option>
-                <option>Safety risk</option>
-              </select>
-            </label>
             <label className="wideField">
-              What outcome do you need?
+              {t.fOutcome}
               <input
                 value={details.requestedResolution}
                 onChange={(e) => setDetails({ ...details, requestedResolution: e.target.value })}
-                placeholder="e.g. Restore supply and inspect the damaged line"
+                placeholder={t.phOutcome}
               />
             </label>
           </div>
@@ -1461,25 +1610,21 @@ function Describe({
               ? details.startedOn
                 ? details.affectedPeople
                   ? details.requestedResolution
-                    ? "Your complaint has enough structured detail for review."
-                    : "AI question: What action would solve this problem for you?"
-                  : "AI question: About how many people or households are affected?"
-                : "AI question: When did this problem begin?"
-              : "AI question: आपका गाँव, वार्ड, टोला या पास की पहचान क्या है?"}
+                    ? t.aiEnough
+                    : t.aiQOutcome
+                  : t.aiQAffected
+                : t.aiQStart
+              : t.aiQVillage}
           </p>
         </div>
         <div className="locationPanel">
           <span className="locationPin">⌖</span>
           <div>
-            <b>
-              {gpsLocation
-                ? "Current location added"
-                : "Add your current location"}
-            </b>
+            <b>{gpsLocation ? t.locAdded : t.locAdd}</b>
             <p>
               {gpsLocation
                 ? gpsLocation.address || gpsLocation.label
-                : "Uses GPS once. You review it before submitting."}
+                : t.locHint}
             </p>
             {gpsLocation?.address && <small>{gpsLocation.label}</small>}
           </div>
@@ -1488,76 +1633,60 @@ function Describe({
             onClick={getGpsLocation}
             disabled={locating}
           >
-            {locating
-              ? "Locating…"
-              : gpsLocation
-                ? "Refresh GPS"
-                : "Use my GPS"}
+            {locating ? t.locating : gpsLocation ? t.locRefresh : t.locUse}
           </button>
         </div>
-        <div className="uploadZone" onClick={() => fileRef.current?.click()}>
+        <button
+          type="button"
+          className="uploadZone"
+          onClick={() => fileRef.current?.click()}
+        >
           <input
             ref={fileRef}
             type="file"
             multiple
             accept="image/*,.pdf"
+            tabIndex={-1}
             onChange={(e) =>
               setFiles(Array.from(e.target.files ?? []).map((f) => f.name))
             }
           />
           <span>＋</span>
           <div>
-            <b>
-              {hi
-                ? "फोटो या दस्तावेज़ जोड़ें (वैकल्पिक)"
-                : "Add photos or documents (optional)"}
-            </b>
-            <p>
-              {files.length
-                ? files.join(", ")
-                : "Photos or PDF · previewed locally before submission"}
-            </p>
+            <b>{t.uploadTitle}</b>
+            <p>{files.length ? files.join(", ") : t.uploadHint}</p>
           </div>
-        </div>
+        </button>
         <div className="tip">
           <span>i</span>
           <p>
-            <b>{hi ? "बेहतर शिकायत के लिए" : "For a stronger complaint"}</b>
+            <b>{t.tipTitle}</b>
             <br />
-            {hi
-              ? "जगह, तारीख और समस्या कब शुरू हुई, यह बताएँ।"
-              : "Include your location, when it started, and how it affects you."}
+            {t.tipBody}
           </p>
         </div>
         <button className="primary" disabled={loading} onClick={prepare}>
-          {loading
-            ? hi
-              ? "तैयार हो रही है..."
-              : "Organising your words..."
-            : t.prepare}
+          {loading ? t.preparing : t.prepare}
           <span>{loading ? "✦" : "→"}</span>
         </button>
-        <p className="aiNote">
-          ✦ AI organises your words. You review and edit everything before
-          sending.
-        </p>
+        <p className="aiNote">✦ {t.aiNote}</p>
         <p className="savedNote">✓ {t.saved}</p>
       </section>
-      <Nearby hi={hi} state={selectedState} />
+      <Nearby t={t} state={selectedState} />
     </div>
   );
 }
-function Nearby({ hi, state }: { hi: boolean; state: string }) {
+function Nearby({ t, state }: { t: Dict; state: string }) {
   return (
     <aside>
       <section className="nearbyCard">
         <div className="cardTop">
           <span>⌖</span>
           <div>
-            <h3>{hi ? "आपके आस-पास" : "Happening near you"}</h3>
-            <p>{hi ? "आप अकेले नहीं हैं" : "You’re not the only one"}</p>
+            <h3>{t.nearbyTitle}</h3>
+            <p>{t.nearbySub}</p>
           </div>
-          <b>SAMPLE DATA</b>
+          <b>{t.sampleData}</b>
         </div>
         <div className="mapDots">
           <span />
@@ -1566,31 +1695,27 @@ function Nearby({ hi, state }: { hi: boolean; state: string }) {
           <span />
         </div>
         <ul>
-          <li>
-            <span className="category water">Water</span>
-            <strong>No water supply for 3 days</strong>
-            <small>{state || "Your State/UT"} · sample report</small>
-          </li>
-          <li>
-            <span className="category road">Roads</span>
-            <strong>Dangerous pothole near school</strong>
-            <small>{state || "Your State/UT"} · sample report</small>
-          </li>
-          <li>
-            <span className="category waste">Waste</span>
-            <strong>Garbage not collected this week</strong>
-            <small>{state || "Your State/UT"} · sample report</small>
-          </li>
+          {[
+            ["water", t.catWater, t.near1],
+            ["road", t.catRoads, t.near2],
+            ["waste", t.catWaste, t.near3],
+          ].map(([tone, label, headline]) => (
+            <li key={headline}>
+              <span className={`category ${tone}`}>{label}</span>
+              <strong>{headline}</strong>
+              <small>
+                {state || t.yourState} · {t.sampleReport}
+              </small>
+            </li>
+          ))}
         </ul>
-        <p className="privacy">
-          ◉ Your exact location is never shown publicly.
-        </p>
+        <p className="privacy">◉ {t.nearbyPrivacy}</p>
       </section>
       <section className="helpCard">
         <span>☎</span>
         <div>
-          <b>{hi ? "लिखने में मदद चाहिए?" : "Need help filing?"}</b>
-          <p>Prototype support line: 1800-000-000</p>
+          <b>{t.helpTitle}</b>
+          <p>{t.helpBody}</p>
         </div>
       </section>
     </aside>
@@ -1609,7 +1734,7 @@ function Review({
   setAnalysis: (a: Analysis) => void;
   back: () => void;
   submit: () => void;
-  t: typeof copy.en;
+  t: Dict;
   details: ComplaintDetails;
   submitting: boolean;
 }) {
@@ -1618,40 +1743,69 @@ function Review({
       <div className="reviewBanner">
         <span>✦</span>
         <div>
-          <b>We found the right route</b>
-          <p>
-            {analysis.source === "openai"
-              ? "Classified by OpenAI · Please confirm"
-              : "AI-assisted routing preview · Review before submitting"}
-          </p>
+          <b>{t.rvFound}</b>
+          <p>{analysis.source === "openai" ? t.rvClassified : t.rvPreview}</p>
         </div>
-        <em>AI ASSISTED</em>
+        <em>{t.aiAssisted}</em>
       </div>
+      <div className={`triageCard urgency${analysis.urgency}`}>
+        <div className="triageStep">
+          <span>1</span>
+          <div>
+            <label>{t.rvUrgency}</label>
+            <b>{urgencyLabel(t, analysis.urgency)}</b>
+            <p>{analysis.urgencyReason}</p>
+          </div>
+        </div>
+        <div className="triageArrow">→</div>
+        <div className="triageStep">
+          <span>2</span>
+          <div>
+            <label>{t.rvCategoryLabel}</label>
+            <b>{analysis.category}</b>
+            <p>{analysis.department}</p>
+          </div>
+        </div>
+        <div className="triageArrow">→</div>
+        <div className="triageStep">
+          <span>3</span>
+          <div>
+            <label>{t.rvOfficerLabel}</label>
+            <b>{analysis.assignedOfficer}</b>
+            <p>{t.rvOfficerNote}</p>
+          </div>
+        </div>
+      </div>
+      {analysis.emergencyWarning && (
+        <div className="emergencyWarning" role="alert">
+          <b>⚠ {t.emergencyTitle}</b>
+          <p>{t.emergencyBody}</p>
+        </div>
+      )}
       <div className="reviewDetails">
-        <b>Structured complaint payload</b>
+        <b>{t.payloadTitle}</b>
         <dl>
-          <div><dt>District / city</dt><dd>{details.district || "Not provided"}</dd></div>
-          <div><dt>Block / tehsil</dt><dd>{details.blockTehsil || "Not provided"}</dd></div>
-          <div><dt>Gram panchayat</dt><dd>{details.gramPanchayat || "Not provided"}</dd></div>
-          <div><dt>Village / ward / hamlet</dt><dd>{details.locality || "Not provided"}</dd></div>
-          <div><dt>Started</dt><dd>{details.startedOn || "Not provided"}</dd></div>
-          <div><dt>Frequency</dt><dd>{details.frequency}</dd></div>
-          <div><dt>People affected</dt><dd>{details.affectedPeople || "Not provided"}</dd></div>
-          <div><dt>Urgency</dt><dd>{details.urgency}</dd></div>
-          <div><dt>Requested outcome</dt><dd>{details.requestedResolution || "Not provided"}</dd></div>
+          <div><dt>{t.dtDistrict}</dt><dd>{details.district || t.notProvided}</dd></div>
+          <div><dt>{t.dtBlock}</dt><dd>{details.blockTehsil || t.notProvided}</dd></div>
+          <div><dt>{t.dtPanchayat}</dt><dd>{details.gramPanchayat || t.notProvided}</dd></div>
+          <div><dt>{t.dtVillage}</dt><dd>{details.locality || t.notProvided}</dd></div>
+          <div><dt>{t.dtStarted}</dt><dd>{details.startedOn || t.notProvided}</dd></div>
+          <div><dt>{t.dtFrequency}</dt><dd>{details.frequency}</dd></div>
+          <div><dt>{t.dtAffected}</dt><dd>{details.affectedPeople || t.notProvided}</dd></div>
+          <div><dt>{t.dtOutcome}</dt><dd>{details.requestedResolution || t.notProvided}</dd></div>
         </dl>
       </div>
       <div className="reviewFields">
         <div>
-          <label>Department</label>
+          <label>{t.fDepartment}</label>
           <p>{analysis.department}</p>
         </div>
         <div>
-          <label>Category</label>
+          <label>{t.fCategory}</label>
           <p>{analysis.category}</p>
         </div>
         <div>
-          <label>Location</label>
+          <label>{t.fLocation}</label>
           <input
             value={analysis.location}
             onChange={(e) =>
@@ -1660,31 +1814,28 @@ function Review({
           />
         </div>
         <div>
-          <label>Issue type</label>
+          <label>{t.fIssueType}</label>
           <p>{analysis.issueType}</p>
         </div>
       </div>
-      <label htmlFor="summary">Your grievance summary</label>
+      <label htmlFor="summary">{t.summaryLabel}</label>
       <textarea
         id="summary"
         className="summaryBox"
         value={analysis.summary}
         onChange={(e) => setAnalysis({ ...analysis, summary: e.target.value })}
       />
-      <div className="humanCheck">
-        ✓ Nothing is sent until you press “Submit grievance.” Check names, dates
-        and location carefully.
-      </div>
+      <div className="humanCheck">✓ {t.humanCheck}</div>
       <div className="issueNumberPromise">
-        <b># A unique issue number will be created</b>
-        <p>Save it with the filer’s name to track this complaint from any device.</p>
+        <b># {t.promiseTitle}</b>
+        <p>{t.promiseBody}</p>
       </div>
       <div className="buttonRow">
         <button className="secondary" onClick={back}>
           ← {t.edit}
         </button>
         <button className="primary compact" onClick={submit} disabled={submitting}>
-          {submitting ? "Generating issue number…" : t.submit}
+          {submitting ? t.submitting : t.submit}
           <span>→</span>
         </button>
       </div>
@@ -1693,6 +1844,7 @@ function Review({
 }
 function Track({
   analysis,
+  stages,
   stage,
   advance,
   grievanceId,
@@ -1702,12 +1854,13 @@ function Track({
   readOnly,
 }: {
   analysis: Analysis;
+  stages: ReturnType<typeof buildStages>;
   stage: number;
   advance: () => void;
   grievanceId: string;
   isAppeal: boolean;
   onConfirm: () => void;
-  t: typeof copy.en;
+  t: Dict;
   readOnly: boolean;
 }) {
   const shown = isAppeal ? 2 : stage;
@@ -1716,18 +1869,15 @@ function Track({
       <section className="timelineCard">
         <div className="caseHeader">
           <div>
-            <span>{isAppeal ? "APPEAL" : "GRIEVANCE"} ID</span>
+            <span>{isAppeal ? t.appealIdLabel : t.grievanceIdLabel}</span>
             <h2>{isAppeal ? "AP-JS-2026-1047" : grievanceId}</h2>
           </div>
-          <button onClick={() => window.print()}>⇩ Save receipt</button>
+          <button onClick={() => window.print()}>⇩ {t.saveReceipt}</button>
         </div>
         {isAppeal && (
           <div className="escalationBanner">
-            <b>Appeal accepted</b>
-            <p>
-              Escalation officer Anil Menon must review this separately from the
-              original decision.
-            </p>
+            <b>{t.appealAcceptedTitle}</b>
+            <p>{t.appealAcceptedBody}</p>
           </div>
         )}
         <div className="timeline">
@@ -1754,17 +1904,17 @@ function Track({
                     </time>
                   )}
                 </div>
-                <p>
-                  {i <= shown ? s.detail : "This update has not happened yet."}
-                </p>
-                <em>Expected: {s.sla}</em>
+                <p>{i <= shown ? s.detail : t.notYet}</p>
+                <em>
+                  {t.expectedWord}: {s.sla}
+                </em>
               </div>
             </div>
           ))}
         </div>
         {!readOnly && <div className="demoControl">
-          <span>LIFECYCLE PREVIEW</span>
-          <p>Advance this sample case to see the full grievance journey.</p>
+          <span>{t.lifecycleKicker}</span>
+          <p>{t.lifecycleBody}</p>
           {shown < 4 ? (
             <button className="primary compact" onClick={advance}>
               {t.next}
@@ -1772,52 +1922,69 @@ function Track({
             </button>
           ) : (
             <button className="primary compact" onClick={onConfirm}>
-              Confirm resolution<span>→</span>
+              {t.confirmResolution}
+              <span>→</span>
             </button>
           )}
         </div>}
         {readOnly && (
           <div className="trackingNotice">
-            <b>✓ Verified tracking result</b>
-            <p>This is a read-only status view. Only authorised grievance staff can update the complaint.</p>
+            <b>✓ {t.readonlyTitle}</b>
+            <p>{t.readonlyBody}</p>
           </div>
         )}
       </section>
       <aside className="caseAside">
         <section className="officerCard">
-          <span>ASSIGNED OFFICER · SAMPLE DATA</span>
+          <span>{t.officerRoleLabel}</span>
           <div className="officer">
-            <b>PS</b>
+            <b>
+              {isAppeal
+                ? "AM"
+                : analysis.assignedOfficer
+                    .split(/\s+/)
+                    .filter((part) => /^[A-Z]/.test(part))
+                    .slice(0, 2)
+                    .map((part) => part[0])
+                    .join("") || "GO"}
+            </b>
             <div>
-              <h3>{isAppeal ? "Anil Menon" : "Priya Sharma"}</h3>
-              <p>{isAppeal ? "Escalation Officer" : "Assistant Engineer"}</p>
+              <h3>{isAppeal ? "Anil Menon" : analysis.assignedOfficer}</h3>
+              <p>
+                {isAppeal
+                  ? t.escalationRole
+                  : `${urgencyLabel(t, analysis.urgency)} ${t.priorityWord} · ${analysis.category}`}
+              </p>
             </div>
           </div>
-          <p className="contactRule">
-            For privacy, contact stays inside JanSetu.
-          </p>
+          <p className="contactRule">{t.contactRule}</p>
         </section>
         <section className="caseSummary">
-          <span>YOUR COMPLAINT</span>
+          <span>{t.yourComplaint}</span>
           <h3>{analysis.category}</h3>
           <p>{analysis.summary}</p>
           <dl>
             <div>
-              <dt>Department</dt>
+              <dt>{t.ddDepartment}</dt>
               <dd>{analysis.department}</dd>
             </div>
             <div>
-              <dt>Location</dt>
+              <dt>{t.ddLocation}</dt>
               <dd>{analysis.location}</dd>
+            </div>
+            <div>
+              <dt>{t.ddUrgency}</dt>
+              <dd>{urgencyLabel(t, analysis.urgency)}</dd>
+            </div>
+            <div>
+              <dt>{t.ddAssigned}</dt>
+              <dd>{analysis.assignedOfficer}</dd>
             </div>
           </dl>
         </section>
         <section className="slaCard">
-          <b>◷ SLA promise</b>
-          <p>
-            If the deadline is missed, you’ll see an escalation button here
-            automatically.
-          </p>
+          <b>◷ {t.slaTitle}</b>
+          <p>{t.slaBody}</p>
         </section>
       </aside>
     </div>
@@ -1832,36 +1999,35 @@ function Confirm({
   grievanceId: string;
   yes: () => void;
   no: () => void;
-  t: typeof copy.en;
+  t: Dict;
 }) {
   return (
     <section className="confirmCard">
       <span className="bigCheck">✓</span>
-      <p className="caseRef">CASE {grievanceId} · SAMPLE DATA</p>
-      <h2>The department marked this resolved</h2>
+      <p className="caseRef">
+        {t.caseWord} {grievanceId} · {t.sampleData}
+      </p>
+      <h2>{t.confirmHeadline}</h2>
       <div className="resolutionNote">
-        <span>ACTION REPORTED</span>
-        <p>
-          “Field team inspected the supply line and cleared a blockage near the
-          community centre. Water supply was restored at 3:40 PM.”
-        </p>
-        <small>Reported by officer Priya Sharma · 31 Aug, 4:15 PM</small>
+        <span>{t.actionReported}</span>
+        <p>{t.resolutionNote}</p>
+        <small>{t.reportedBy}</small>
       </div>
-      <h3>Is your issue actually fixed?</h3>
-      <p>Your answer matters. We won’t close the case unless you say yes.</p>
+      <h3>{t.confirmQuestion}</h3>
+      <p>{t.confirmBody}</p>
       <div className="choiceRow">
         <button className="yesButton" onClick={yes}>
           <b>✓</b>
           <span>
             {t.fixed}
-            <small>Close this grievance</small>
+            <small>{t.fixedSub}</small>
           </span>
         </button>
         <button className="noButton" onClick={no}>
           <b>×</b>
           <span>
             {t.notFixed}
-            <small>Start a tracked appeal</small>
+            <small>{t.notFixedSub}</small>
           </span>
         </button>
       </div>
@@ -1879,37 +2045,37 @@ function Appeal({
   setReason: (v: string) => void;
   submit: () => void;
   back: () => void;
-  t: typeof copy.en;
+  t: Dict;
 }) {
   return (
     <section className="singleCard appealCard">
       <div className="escalationPerson">
         <b>AM</b>
         <div>
-          <span>NAMED ESCALATION OFFICER · SAMPLE DATA</span>
+          <span>{t.escalationKicker}</span>
           <h3>Anil Menon</h3>
-          <p>Deputy Director · Independent appeal review</p>
+          <p>{t.escalationSub}</p>
         </div>
       </div>
-      <label htmlFor="appeal">What is still wrong?</label>
+      <label htmlFor="appeal">{t.appealLabel}</label>
       <textarea
         id="appeal"
         value={reason}
         onChange={(e) => setReason(e.target.value)}
-        placeholder="Example: Water returned for one hour but stopped again the same evening..."
+        placeholder={t.appealPlaceholder}
       />
       <div className="appealFacts">
-        <b>Your appeal automatically includes:</b>
-        <span>✓ Original grievance and evidence</span>
-        <span>✓ Full status history</span>
-        <span>✓ Department’s resolution note</span>
+        <b>{t.appealIncludes}</b>
+        <span>✓ {t.appealInc1}</span>
+        <span>✓ {t.appealInc2}</span>
+        <span>✓ {t.appealInc3}</span>
       </div>
       <div className="buttonRow">
         <button className="secondary" onClick={back}>
           ← {t.back}
         </button>
         <button className="primary compact" onClick={submit}>
-          {t.appeal}
+          {t.appealSubmit}
           <span>→</span>
         </button>
       </div>
@@ -1917,38 +2083,58 @@ function Appeal({
   );
 }
 function Closed({
+  t,
   grievanceId,
   home,
+  rating,
+  setRating,
+  resolutionFeedback,
 }: {
+  t: Dict;
   grievanceId: string;
   home: () => void;
+  rating: number;
+  setRating: (value: number) => void;
+  resolutionFeedback: "resolved" | "not-resolved" | "";
 }) {
   return (
     <section className="confirmCard closedCard">
       <span className="bigCheck">✓</span>
-      <p className="caseRef">CASE {grievanceId}</p>
-      <h2>Case closed with your confirmation</h2>
-      <p>
-        Your feedback helps measure whether reported actions solve real
-        problems—not just whether a file was moved.
+      <p className="caseRef">
+        {t.caseWord} {grievanceId}
       </p>
+      <h2>{t.closedHeadline}</h2>
+      <p>{t.closedBody}</p>
+      <div className="qualityRecorded">
+        <b>✓ {t.qualityRecordedTitle}</b>
+        <p>{t.qualityRecordedBody}</p>
+        <small>{resolutionFeedback === "resolved" ? t.qualityResolved : t.qualityNotResolved}</small>
+      </div>
       <div className="rating">
-        <span>How easy was this process?</span>
+        <span>{t.ratingQ}</span>
         <div>
-          <button>1</button>
-          <button>2</button>
-          <button>3</button>
-          <button>4</button>
-          <button>5</button>
+          {[1, 2, 3, 4, 5].map((value) => (
+            <button
+              key={value}
+              className={rating === value ? "selected" : ""}
+              aria-pressed={rating === value}
+              onClick={() => setRating(value)}
+            >
+              {value}
+            </button>
+          ))}
         </div>
-        <small>Very hard　　　　　　　　　Very easy</small>
+        <small>
+          {t.ratingHard}
+          <em>{t.ratingEasy}</em>
+        </small>
       </div>
       <div className="buttonRow center">
         <button className="secondary" onClick={() => window.print()}>
-          ⇩ Print receipt
+          ⇩ {t.printReceipt}
         </button>
         <button className="primary compact" onClick={home}>
-          Return home
+          {t.returnHome}
         </button>
       </div>
     </section>

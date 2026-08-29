@@ -1,0 +1,265 @@
+/* ── Language gate ──────────────────────────────────────────────────
+   Shown full-page on a first visit, and as an overlay when someone
+   switches language later from the header. */
+.languageGate {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  overflow-y: auto;
+}
+.languageGate.fullPage {
+  background: radial-gradient(120% 90% at 50% 0%, #eef7f2 0%, #f7fbf9 45%, #fff 100%);
+}
+.languageGate.overlay {
+  background: rgba(14, 40, 40, 0.55);
+  backdrop-filter: blur(6px);
+}
+
+.languageCard {
+  position: relative;
+  width: min(660px, 100%);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 26px;
+  padding: 38px 38px 30px;
+  box-shadow: 0 30px 70px -30px rgba(13, 60, 58, 0.4);
+  text-align: center;
+  margin: auto;
+}
+.languageGate.fullPage .languageCard {
+  border-color: #dcebe4;
+  box-shadow: 0 40px 90px -44px rgba(13, 60, 58, 0.45);
+}
+
+.languageMark {
+  width: 60px;
+  height: 60px;
+  margin: 0 auto 18px;
+  display: grid;
+  place-items: center;
+  background: var(--teal);
+  color: #fff;
+  border-radius: 18px 18px 18px 5px;
+  font-size: 30px;
+  line-height: 1;
+}
+.languageKicker {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: #5c7a76;
+}
+.languageCard h1 {
+  margin: 0 0 12px;
+  font-size: clamp(25px, 3.4vw, 34px);
+  letter-spacing: -0.03em;
+  line-height: 1.18;
+}
+.languageIntro {
+  max-width: 470px;
+  margin: 0 auto 26px;
+  color: #5b7371;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.languageList {
+  list-style: none;
+  margin: 0 0 24px;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
+  text-align: start;
+}
+.languageList button {
+  position: relative;
+  width: 100%;
+  min-height: 68px;
+  padding: 13px 38px 13px 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  background: #fbfdfc;
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  color: var(--ink);
+  text-align: start;
+  transition: border-color 0.15s, background 0.15s, transform 0.1s;
+}
+.languageList button:hover {
+  border-color: #9dc0b6;
+  background: #f4faf7;
+}
+.languageList button:active { transform: scale(0.99); }
+.languageList button.selected {
+  border-color: var(--teal);
+  background: #eef7f2;
+  box-shadow: inset 0 0 0 1px var(--teal);
+}
+.languageList b {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.languageList small {
+  font-size: 12px;
+  font-weight: 600;
+  color: #71908b;
+  letter-spacing: 0.02em;
+}
+.languageList i {
+  position: absolute;
+  inset-inline-end: 13px;
+  top: 50%;
+  translate: 0 -50%;
+  width: 21px;
+  height: 21px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--teal);
+  color: #fff;
+  font-size: 11px;
+  font-style: normal;
+  opacity: 0;
+  scale: 0.6;
+  transition: opacity 0.15s, scale 0.15s;
+}
+.languageList button.selected i { opacity: 1; scale: 1; }
+
+.languageContinue {
+  width: min(300px, 100%);
+  justify-content: center;
+}
+.languageFooter {
+  display: block;
+  margin-top: 14px;
+  color: #7b9491;
+  font-size: 12.5px;
+}
+
+/* Header switcher — now a control that reopens the picker. */
+.languageButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.languageButton i {
+  font-style: normal;
+  font-size: 13px;
+  color: var(--teal);
+}
+
+@media (max-width: 560px) {
+  .languageCard { padding: 30px 20px 24px; border-radius: 20px; }
+  .languageList { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+  .languageList button { min-height: 62px; }
+  .languageList b { font-size: 16px; }
+}
+
+/* ── Script-aware typography ────────────────────────────────────────
+   The base type scale was tuned for Latin. Indic scripts carry taller
+   ascenders and below-baseline marks, so the tight display leading
+   clips them; they also run 30–60% longer than the English source,
+   which overflows anything sized for "Describe" or "VERIFIED". */
+html:not([lang="en"]) h1 {
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+html:not([lang="en"]) h2,
+html:not([lang="en"]) h3 {
+  line-height: 1.36;
+}
+html:not([lang="en"]) .hero > p,
+html:not([lang="en"]) .homeCopy > p {
+  line-height: 1.7;
+}
+
+/* Journey rail: let long step names wrap instead of forcing overflow. */
+.journey {
+  flex-wrap: wrap;
+  row-gap: 10px;
+}
+.journey span {
+  white-space: normal;
+}
+.journey em {
+  max-width: 15ch;
+}
+html:not([lang="en"]) .journey i {
+  width: 26px;
+  margin: 0 6px;
+}
+
+/* Status pills keep their size; the label beside them wraps instead. */
+.securityStepTitle b {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.securityStepTitle em {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/* Headers and labels that pair a title with an action. */
+.caseHeader,
+.sectionHeading,
+.promiseTop {
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.cardTop h3,
+.caseHeader h2,
+.reviewBanner b {
+  overflow-wrap: anywhere;
+}
+
+/* The rating scale labels sit at opposite ends of the row. */
+.rating small {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.rating small em {
+  font-style: normal;
+}
+
+/* Held for the one frame it takes to read the saved language. */
+.bootSplash {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(180deg, #f4faf7 0, #fff 38%);
+}
+.bootSplash .languageMark {
+  margin: 0;
+  animation: bootPulse 1.1s ease-in-out infinite;
+}
+@keyframes bootPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bootSplash .languageMark { animation: none; }
+}
+
+/* The upload zone is a real <button> so it is keyboard reachable; strip the
+   UA button styling it inherits and keep the original dashed-drop look. */
+button.uploadZone {
+  width: 100%;
+  text-align: start;
+  font: inherit;
+  color: inherit;
+}
+button.uploadZone:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 2px;
+}
