@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   LANGUAGES,
   detectLanguage,
@@ -1309,6 +1309,11 @@ function PortalPanelView({
   close: () => void;
   openPanel: (panel: PortalPanel) => void;
 }) {
+  if (panel === "process") return <ProcessPanel t={t} close={close} />;
+  if (panel === "officers") return <OfficersPanel t={t} close={close} />;
+  if (panel === "help") return <FaqPanel t={t} close={close} openPanel={openPanel} />;
+  if (panel === "appeal-authority") return <AppealAuthorityPanel t={t} close={close} />;
+
   const content = {
     about: {
       icon: "◎",
@@ -1402,6 +1407,126 @@ function PortalPanelView({
         {panel !== "help" && <button className="primary compact portalPanelButton" onClick={close}>{t.closeWord}</button>}
       </section>
     </div>
+  );
+}
+
+function PanelShell({ children, title, close, t }: { children: ReactNode; title: string; close: () => void; t: Dict }) {
+  return (
+    <div className="portalOverlay" role="dialog" aria-modal="true" aria-labelledby="portal-panel-title">
+      <section className="portalPanel richPanel">
+        <button className="gateClose" onClick={close} aria-label={t.closeWord}>×</button>
+        {children}
+      </section>
+    </div>
+  );
+}
+
+function ProcessPanel({ t, close }: { t: Dict; close: () => void }) {
+  const steps = [
+    [t.processStep1Title, t.processStep1Body],
+    [t.processStep2Title, t.processStep2Body],
+    [t.processStep3Title, t.processStep3Body],
+    [t.processStep4Title, t.processStep4Body],
+    [t.processStep5Title, t.processStep5Body],
+  ];
+  return (
+    <PanelShell title={t.portalProcessTitle} close={close} t={t}>
+      <span className="portalPanelIcon">↗</span>
+      <p className="portalPanelKicker">{t.portalProcessKicker}</p>
+      <h2 id="portal-panel-title">{t.portalProcessTitle}</h2>
+      <p className="portalPanelBody">{t.portalProcessBody}</p>
+      <div className="processTimeline">
+        {steps.map(([stepTitle, body], i) => (
+          <div className="processStep" key={stepTitle}>
+            <b>{String(i + 1).padStart(2, "0")}</b>
+            <div><h3>{stepTitle}</h3><p>{body}</p></div>
+          </div>
+        ))}
+      </div>
+      <a className="portalSource" href="https://pgportal.gov.in/Home/ProcessFlow" target="_blank" rel="noreferrer">↗ {t.portalOfficialProcess}</a>
+    </PanelShell>
+  );
+}
+
+function OfficersPanel({ t, close }: { t: Dict; close: () => void }) {
+  const [query, setQuery] = useState("");
+  const officers = [
+    ["Administrative Reforms & Public Grievances", "Sardendu Kumar Pandey", "Director", "01123401455", "Director-pg@gov.in"],
+    ["Agriculture & Farmers Welfare", "Rajesh Kumar", "Deputy Secretary PG", "01123074238", "rajesh.kumar67@nic.in"],
+    ["Agriculture Research & Education", "Narendra Kumar", "Deputy Secretary", "01123046678", "narendra.kumar74@nic.in"],
+    ["Animal Husbandry, Dairying", "RPS Rathore", "Director", "01123385797", "r.rathore@gov.in"],
+    ["Atomic Energy", "K.V. Madhavadas", "Deputy Secretary", "02222862516", "dsscs@dae.gov.in"],
+    ["Income Tax (CBDT)", "Swapna Devireddy", "Additional Director", "01123416133", "delhi.addldit.eservices@incometax.gov.in"],
+  ];
+  const visible = officers.filter((o) => o.join(" ").toLowerCase().includes(query.toLowerCase()));
+  return (
+    <PanelShell title={t.portalOfficersTitle} close={close} t={t}>
+      <span className="portalPanelIcon">◌</span>
+      <p className="portalPanelKicker">{t.portalOfficersKicker}</p>
+      <h2 id="portal-panel-title">{t.portalOfficersTitle}</h2>
+      <p className="portalPanelBody">{t.portalOfficersBody}</p>
+      <div className="directoryMeta"><span>{t.officerDirectoryCount}</span><span>{t.officerDirectoryNote}</span></div>
+      <label className="directorySearch"><span>{t.directorySearchLabel}</span><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t.directorySearchPlaceholder} /></label>
+      <div className="officerDirectory">
+        {visible.map(([department, name, role, phone, email]) => (
+          <article className="officerRow" key={department}>
+            <div><b>{department}</b><strong>{name}</strong><span>{role}</span></div>
+            <div className="officerContact"><a href={`tel:${phone}`}>☎ {phone}</a><a href={`mailto:${email}`}>✉ {email}</a></div>
+          </article>
+        ))}
+        {!visible.length && <p className="directoryEmpty">{t.directoryEmpty}</p>}
+      </div>
+      <a className="portalSource" href="https://pgportal.gov.in/Home/NodalPgOfficers" target="_blank" rel="noreferrer">↗ {t.portalOfficialDirectory}</a>
+    </PanelShell>
+  );
+}
+
+function FaqPanel({ t, close, openPanel }: { t: Dict; close: () => void; openPanel: (panel: PortalPanel) => void }) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(0);
+  const faqs = [
+    [t.faq1Question, t.faq1Answer], [t.faq2Question, t.faq2Answer], [t.faq3Question, t.faq3Answer],
+    [t.faq4Question, t.faq4Answer], [t.faq5Question, t.faq5Answer], [t.faq6Question, t.faq6Answer],
+  ].filter(([question]) => question.toLowerCase().includes(query.toLowerCase()));
+  return (
+    <PanelShell title={t.portalHelpTitle} close={close} t={t}>
+      <span className="portalPanelIcon">?</span>
+      <p className="portalPanelKicker">{t.portalHelpKicker}</p>
+      <h2 id="portal-panel-title">{t.portalHelpTitle}</h2>
+      <p className="portalPanelBody">{t.portalHelpBody}</p>
+      <label className="directorySearch faqSearch"><span>{t.faqSearchLabel}</span><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t.faqSearchPlaceholder} /></label>
+      <div className="faqList">
+        {faqs.map(([question, answer], i) => (
+          <div className={`faqItem ${open === i ? "open" : ""}`} key={question}>
+            <button onClick={() => setOpen(open === i ? -1 : i)} aria-expanded={open === i}><span>{question}</span><b>{open === i ? "−" : "+"}</b></button>
+            {open === i && <p>{answer}</p>}
+          </div>
+        ))}
+      </div>
+      <div className="faqCallout"><b>{t.faqAppealCalloutTitle}</b><p>{t.faqAppealCalloutBody}</p><button onClick={() => { close(); openPanel("appeal-authority"); }}>{t.portalAppeal}</button></div>
+      <a className="portalSource" href="https://pgportal.gov.in/Home/Faq" target="_blank" rel="noreferrer">↗ {t.portalOfficialFaq}</a>
+    </PanelShell>
+  );
+}
+
+function AppealAuthorityPanel({ t, close }: { t: Dict; close: () => void }) {
+  const officers = [
+    ["Income Tax (CBDT)", "Dipi Agarwal", "01123416148"],
+    ["Indirect Taxes & Customs", "Dr. Shailendra Kumar Sinha", "01123705809"],
+    ["Industry & Internal Trade", "Jai Prakash Shivahare", "01123038876"],
+    ["Agriculture & Farmers Welfare", "S. Rukmani", "01123381305"],
+    ["Atomic Energy", "Nidhi Pandey", "02222027535"],
+  ];
+  return (
+    <PanelShell title={t.portalAppealTitle} close={close} t={t}>
+      <span className="portalPanelIcon">↑</span>
+      <p className="portalPanelKicker">{t.portalAppealKicker}</p>
+      <h2 id="portal-panel-title">{t.portalAppealTitle}</h2>
+      <p className="portalPanelBody">{t.portalAppealBody}</p>
+      <div className="appealRule"><b>{t.appealWindowTitle}</b><span>{t.appealWindowValue}</span><p>{t.appealWindowBody}</p></div>
+      <div className="appealDirectory">{officers.map(([department, name, phone]) => <div key={department}><span>{department}</span><b>{name}</b><a href={`tel:${phone}`}>☎ {phone}</a></div>)}</div>
+      <a className="portalSource" href="https://pgportal.gov.in/Home/NodalAuthorityForAppeal" target="_blank" rel="noreferrer">↗ {t.portalOfficialAppeal}</a>
+  </PanelShell>
   );
 }
 function Journey({ progress, t }: { progress: number; t: Dict }) {
