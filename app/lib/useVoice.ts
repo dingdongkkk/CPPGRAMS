@@ -194,7 +194,8 @@ export function useVoice(language: string) {
         const response = await fetch("/api/voice/speech", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: clean, languageName }),
+          // Bhashini keys on the language code, not a display name.
+          body: JSON.stringify({ text: clean, language, languageName }),
         });
         if (!response.ok) return;
         const url = URL.createObjectURL(await response.blob());

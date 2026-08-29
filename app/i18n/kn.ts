@@ -184,7 +184,7 @@ const kn: Partial<Dict> = {
   helpBody: "ಮಾದರಿ ಸಹಾಯ ಸಂಖ್ಯೆ: 1800-000-000",
 
   rvFound: "ಸರಿಯಾದ ಮಾರ್ಗ ಸಿಕ್ಕಿದೆ",
-  rvClassified: "OpenAI ವರ್ಗೀಕರಿಸಿದೆ · ದಯವಿಟ್ಟು ದೃಢಪಡಿಸಿ",
+  rvClassified: "Groq Nemotron ವರ್ಗೀಕರಿಸಿದೆ · ದಯವಿಟ್ಟು ದೃಢಪಡಿಸಿ",
   rvPreview: "AI ಸಹಾಯದಿಂದ ಇಲಾಖೆ ಆಯ್ಕೆ · ಕಳುಹಿಸುವ ಮೊದಲು ಪರಿಶೀಲಿಸಿ",
   aiAssisted: "AI ಸಹಾಯದಿಂದ",
   rvUrgency: "AI ತುರ್ತು",
