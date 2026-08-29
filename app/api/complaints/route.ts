@@ -31,6 +31,19 @@ function issueNumber() {
 
 function databaseError(error: unknown) {
   const message = error instanceof Error ? error.message : "Database unavailable";
+  // The citizen sees a friendly line, but the operator needs the real cause:
+  // without this, a bad connection string and a missing table are
+  // indistinguishable from the outside.
+  // drizzle wraps driver failures, so the useful part (auth failure, DNS,
+  // missing relation) lives on `cause` rather than the top-level message.
+  const cause = error instanceof Error ? (error.cause as Error | undefined) : undefined;
+  console.error(
+    "[complaints] db error |",
+    "name:", (error as Error)?.name,
+    "| code:", (error as { code?: string })?.code ?? cause?.name,
+    "| cause:", cause?.message ?? "(none)",
+    "| msg:", message.slice(0, 120),
+  );
   // Postgres phrases a missing table as `relation "..." does not exist`,
   // where D1/SQLite said `no such table`. Both are matched so the friendlier
   // "being prepared" message still shows before migrations have run.
