@@ -184,7 +184,7 @@ const mr: Partial<Dict> = {
   helpBody: "नमुना मदत क्रमांक: 1800-000-000",
 
   rvFound: "आम्हाला योग्य मार्ग सापडला",
-  rvClassified: "Groq Nemotron ने वर्गीकृत केले · कृपया खात्री करा",
+  rvClassified: "OpenAI ने वर्गीकृत केले · कृपया खात्री करा",
   rvPreview: "AI-सहाय्याने विभाग निवडला · पाठवण्यापूर्वी तपासा",
   aiAssisted: "AI सहाय्यित",
   rvUrgency: "AI निकड",

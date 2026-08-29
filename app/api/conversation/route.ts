@@ -136,14 +136,20 @@ export async function POST(request: Request) {
   if (!body.userText?.trim())
     return Response.json({ error: "Please say or type an answer." }, { status: 400 });
 
-  const apiKey = process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY;
+  const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return Response.json(fallback(body));
 
-  const groqBaseUrl = process.env.GROQ_BASE_URL || "https://api.groq.com/openai/v1";
-  const model = process.env.GROQ_MODEL || "nvidia/llama-3.1-nemotron-70b-instruct";
-
   try {
-    const systemPrompt = `You are JanSetu's warm, patient voice grievance assistant for India, inspired by the voice-first CPGRAMS experience. Conduct a natural spoken interview in ${body.languageName || body.language || "the citizen's chosen language"}.
+    const response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-5-mini",
+        store: false,
+        instructions: `You are JanSetu's warm, patient voice grievance assistant for India, inspired by the voice-first CPGRAMS experience. Conduct a natural spoken interview in ${body.languageName || body.language || "the citizen's chosen language"}.
 
 Understand each answer even when it contains several facts. Update every field that is explicitly supported by the citizen's words or previously captured data. Never invent names, dates, locations, impact, or requested action. Ask exactly one short, relevant follow-up question at a time. Do not mechanically ask for administrative fields that are irrelevant or already answered. A useful grievance needs: what happened and its effect; the complaint location (unless current GPS location is confirmed); roughly when it began; whether it repeats; who or how many are affected; and what action the citizen wants.
 
@@ -151,45 +157,32 @@ The citizen said the complaint location is ${body.locationMatch === "same" ? "th
 
 The citizen's own filed grievances and appeals are supplied as citizensExistingCases. If they ask about the status of a case, an issue number, an appeal, or what happens next, answer from that data directly and do not treat the question as an answer to your interview — leave captured unchanged and repeat your outstanding question afterwards. Only state facts present in that data; if a case is not listed, say you cannot see it rather than guessing.
 
-Keep assistantMessage conversational and easy to hear aloud, normally one or two sentences. Use the citizen's chosen language and script. Do not translate their grievance into English in captured.description. Set complete true only when enough substance is present to prepare a meaningful grievance; optional administrative location levels may remain blank when the available location is still actionable. When complete, briefly summarize what you understood and ask the citizen to review it on screen.
-
-You must respond ONLY with a valid JSON object matching this schema:
-${JSON.stringify(conversationSchema, null, 2)}`;
-
-    const userPrompt = JSON.stringify({
-      recentConversation: (body.history || []).slice(-10),
-      latestCitizenAnswer: body.userText.trim(),
-      existingCapturedData: body.captured || {},
-      citizensExistingCases: body.caseContext || {},
-    });
-
-    const response = await fetch(`${groqBaseUrl}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        response_format: { type: "json_object" },
-        temperature: 0.2,
+Keep assistantMessage conversational and easy to hear aloud, normally one or two sentences. Use the citizen's chosen language and script. Do not translate their grievance into English in captured.description. Set complete true only when enough substance is present to prepare a meaningful grievance; optional administrative location levels may remain blank when the available location is still actionable. When complete, briefly summarize what you understood and ask the citizen to review it on screen.`,
+        input: JSON.stringify({
+          recentConversation: (body.history || []).slice(-10),
+          latestCitizenAnswer: body.userText.trim(),
+          existingCapturedData: body.captured || {},
+          citizensExistingCases: body.caseContext || {},
+        }),
+        text: {
+          format: {
+            type: "json_schema",
+            name: "grievance_conversation_turn",
+            strict: true,
+            schema: conversationSchema,
+          },
+        },
       }),
     });
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Groq request failed: ${response.status} ${errText}`);
-    }
+    if (!response.ok) throw new Error(`OpenAI request failed: ${response.status}`);
     const result = (await response.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
+      output?: Array<{ content?: Array<{ type: string; text?: string }> }>;
     };
-    const content = result.choices?.[0]?.message?.content;
-    if (!content) throw new Error("No conversation response returned from Groq");
-    const cleanJson = content.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
-    return Response.json({ ...JSON.parse(cleanJson), source: "groq-voice" });
+    const outputText = result.output
+      ?.flatMap((item) => item.content || [])
+      .find((item) => item.type === "output_text")?.text;
+    if (!outputText) throw new Error("No conversation response returned");
+    return Response.json({ ...JSON.parse(outputText), source: "openai-voice" });
   } catch (error) {
     console.error("Conversational AI unavailable; using guided fallback", error);
     return Response.json(fallback(body));

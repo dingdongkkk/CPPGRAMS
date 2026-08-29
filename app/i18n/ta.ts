@@ -184,7 +184,7 @@ const ta: Partial<Dict> = {
   helpBody: "மாதிரி உதவி எண்: 1800-000-000",
 
   rvFound: "சரியான வழியைக் கண்டறிந்தோம்",
-  rvClassified: "Groq Nemotron வகைப்படுத்தியது · உறுதிப்படுத்தவும்",
+  rvClassified: "OpenAI வகைப்படுத்தியது · உறுதிப்படுத்தவும்",
   rvPreview: "AI உதவியுடன் துறைத் தேர்வு · அனுப்பும் முன் சரிபார்க்கவும்",
   aiAssisted: "AI உதவியுடன்",
   rvUrgency: "AI அவசரநிலை",

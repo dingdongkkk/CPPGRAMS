@@ -184,7 +184,7 @@ const te: Partial<Dict> = {
   helpBody: "నమూనా సహాయ నంబరు: 1800-000-000",
 
   rvFound: "సరైన మార్గం దొరికింది",
-  rvClassified: "Groq Nemotron వర్గీకరించింది · దయచేసి ధృవీకరించండి",
+  rvClassified: "OpenAI వర్గీకరించింది · దయచేసి ధృవీకరించండి",
   rvPreview: "AI సహాయంతో శాఖ ఎంపిక · పంపే ముందు పరిశీలించండి",
   aiAssisted: "AI సహాయంతో",
   rvUrgency: "AI ఆవశ్యకత",

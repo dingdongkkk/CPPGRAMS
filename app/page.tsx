@@ -2784,7 +2784,7 @@ function Review({
         <span><IconSpark size={18} /></span>
         <div>
           <b>{t.rvFound}</b>
-          <p>{analysis.source === "groq" || analysis.source === "openai" ? t.rvClassified : t.rvPreview}</p>
+          <p>{analysis.source === "openai" ? t.rvClassified : t.rvPreview}</p>
         </div>
         <em>{t.aiAssisted}</em>
       </div>
