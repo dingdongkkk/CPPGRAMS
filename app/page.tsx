@@ -153,14 +153,41 @@ const extraVoiceLanguages = [
   ["bn-BD", "বাংলা (Bangladesh)"],
 ] as const;
 
-const voiceOpening: Record<LangCode, string> = {
+const conversationLanguages = [
+  ["en-IN", "English"], ["hi-IN", "हिन्दी"], ["as-IN", "অসমীয়া"],
+  ["bn-IN", "বাংলা"], ["brx-IN", "बड़ो"], ["doi-IN", "डोगरी"],
+  ["gu-IN", "ગુજરાતી"], ["kn-IN", "ಕನ್ನಡ"], ["ks-IN", "کٲشُر"],
+  ["kok-IN", "कोंकणी"], ["mai-IN", "मैथिली"], ["ml-IN", "മലയാളം"],
+  ["mni-IN", "মৈতৈলোন্"], ["mr-IN", "मराठी"], ["ne-IN", "नेपाली"],
+  ["or-IN", "ଓଡ଼ିଆ"], ["pa-IN", "ਪੰਜਾਬੀ"], ["sa-IN", "संस्कृतम्"],
+  ["sat-IN", "ᱥᱟᱱᱛᱟᱲᱤ"], ["sd-IN", "سنڌي"], ["ta-IN", "தமிழ்"],
+  ["te-IN", "తెలుగు"], ["ur-IN", "اردو"],
+] as const;
+
+const voiceOpening: Record<string, string> = {
   en: "Hello. Please tell me about the problem in your own words. What happened, and how is it affecting you?",
+  as: "নমস্কাৰ। অনুগ্ৰহ কৰি আপোনাৰ সমস্যাটো নিজৰ ভাষাত কওক। কি ঘটিছে আৰু ই আপোনাক কেনেদৰে প্ৰভাৱিত কৰিছে?",
   hi: "नमस्ते। कृपया अपनी समस्या अपने शब्दों में बताइए। क्या हुआ है और इससे आपको कैसे परेशानी हो रही है?",
   bn: "নমস্কার। আপনার সমস্যাটি নিজের ভাষায় বলুন। কী ঘটেছে এবং এতে আপনার কী অসুবিধা হচ্ছে?",
+  brx: "नमस्कार। अननायै नोंथांनि जेंनाखौ नोंथांनि रावजों बुं।",
+  doi: "नमस्कार। किरपा करियै अपनी समस्या अपने शब्दें च दस्सो।",
+  gu: "નમસ્તે. કૃપા કરીને તમારી સમસ્યા તમારા પોતાના શબ્દોમાં જણાવો. શું થયું અને તેની તમને કેવી અસર થઈ રહી છે?",
   mr: "नमस्कार। कृपया तुमची समस्या तुमच्या शब्दांत सांगा. काय घडले आणि त्याचा तुम्हाला कसा त्रास होत आहे?",
   te: "నమస్కారం. దయచేసి మీ సమస్యను మీ మాటల్లో చెప్పండి. ఏమి జరిగింది, దాని వల్ల మీకు ఎలాంటి ఇబ్బంది కలుగుతోంది?",
   ta: "வணக்கம். உங்கள் பிரச்சினையை உங்கள் சொந்த வார்த்தைகளில் கூறுங்கள். என்ன நடந்தது, அது உங்களை எவ்வாறு பாதிக்கிறது?",
   kn: "ನಮಸ್ಕಾರ. ದಯವಿಟ್ಟು ನಿಮ್ಮ ಸಮಸ್ಯೆಯನ್ನು ನಿಮ್ಮ ಮಾತುಗಳಲ್ಲಿ ತಿಳಿಸಿ. ಏನಾಯಿತು ಮತ್ತು ಅದರಿಂದ ನಿಮಗೆ ಯಾವ ತೊಂದರೆಯಾಗುತ್ತಿದೆ?",
+  ks: "آداب۔ مہربانی کر کے پنن مسئلہ پنن لفظن منز ونیو۔",
+  kok: "नमस्कार. कृपया तुमची समस्या तुमच्या उतरांनी सांगात.",
+  mai: "नमस्कार। कृपया अपन समस्या अपन शब्दमे बताउ।",
+  ml: "നമസ്കാരം. ദയവായി നിങ്ങളുടെ പ്രശ്നം സ്വന്തം വാക്കുകളിൽ പറയൂ. എന്താണ് സംഭവിച്ചത്, അത് നിങ്ങളെ എങ്ങനെ ബാധിക്കുന്നു?",
+  mni: "ꯈꯨꯔꯨꯝꯖꯔꯤ। ꯅꯍꯥꯛꯀꯤ ꯑꯋꯥꯕ ꯅꯍꯥꯛꯀꯤ ꯋꯥꯍꯩꯗ ꯍꯥꯏꯕꯤꯌꯨ।",
+  ne: "नमस्कार। कृपया आफ्नो समस्या आफ्नै शब्दमा भन्नुहोस्। के भयो र यसले तपाईंलाई कसरी असर गरिरहेको छ?",
+  or: "ନମସ୍କାର। ଦୟାକରି ଆପଣଙ୍କ ସମସ୍ୟା ନିଜ ଭାଷାରେ କୁହନ୍ତୁ। କ’ଣ ଘଟିଛି ଏବଂ ଏହା ଆପଣଙ୍କୁ କିପରି ପ୍ରଭାବିତ କରୁଛି?",
+  pa: "ਸਤ ਸ੍ਰੀ ਅਕਾਲ। ਕਿਰਪਾ ਕਰਕੇ ਆਪਣੀ ਸਮੱਸਿਆ ਆਪਣੇ ਸ਼ਬਦਾਂ ਵਿੱਚ ਦੱਸੋ। ਕੀ ਹੋਇਆ ਅਤੇ ਇਸ ਦਾ ਤੁਹਾਡੇ ਉੱਤੇ ਕੀ ਅਸਰ ਪੈ ਰਿਹਾ ਹੈ?",
+  sa: "नमस्कारः। कृपया स्वसमस्यां स्वशब्दैः कथयतु। किं जातम्, तेन भवान् कथं प्रभावितः?",
+  sat: "ᱡᱚᱦᱟᱨ। ᱫᱚᱭᱟᱠᱟᱛᱮ ᱟᱢᱟᱜ ᱫᱤᱜᱫᱷᱟ ᱟᱢᱟᱜ ᱟᱹᱲᱟᱹ ᱛᱮ ᱢᱮᱱ ᱢᱮ।",
+  sd: "سلام۔ مهرباني ڪري پنهنجو مسئلو پنهنجن لفظن ۾ ٻڌايو۔ ڇا ٿيو ۽ ان جو اوهان تي ڪهڙو اثر پيو؟",
+  ur: "السلام علیکم۔ براہِ کرم اپنا مسئلہ اپنے الفاظ میں بتائیں۔ کیا ہوا اور اس سے آپ کو کیا پریشانی ہو رہی ہے؟",
 };
 
 const statesAndUTs = [
@@ -1877,8 +1904,14 @@ function Describe({
   const [aiMessages, setAiMessages] = useState<Array<{ role: "assistant" | "user"; text: string }>>([]);
   const [aiComplete, setAiComplete] = useState(false);
   const [aiVoiceStatus, setAiVoiceStatus] = useState<"idle" | "listening" | "thinking" | "speaking" | "error">("idle");
+  const [aiSpeechLanguage, setAiSpeechLanguage] = useState(speechLanguage);
+  const [aiVoice, setAiVoice] = useState("coral");
   const liveConversationRef = useRef(false);
   const liveRecognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const liveAudioRef = useRef<HTMLAudioElement | null>(null);
+  const liveAudioUrlRef = useRef("");
   const aiMessagesRef = useRef(aiMessages);
   const conversationDataRef = useRef({ description, selectedState, details });
   aiMessagesRef.current = aiMessages;
@@ -1902,91 +1935,157 @@ function Describe({
     setFilingMode(mode);
     setAiComplete(false);
     setAiAnswer("");
-    setAiMessages(mode === "ai" ? [{ role: "assistant", text: voiceOpening[language] }] : []);
+    const languageCode = aiSpeechLanguage.split("-")[0];
+    setAiMessages(mode === "ai" ? [{ role: "assistant", text: voiceOpening[languageCode] || voiceOpening.en }] : []);
   }
 
   function stopLiveConversation() {
     liveConversationRef.current = false;
     liveRecognitionRef.current?.stop();
     liveRecognitionRef.current = null;
+    if (mediaRecorderRef.current?.state === "recording") mediaRecorderRef.current.stop();
+    mediaRecorderRef.current = null;
+    mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+    mediaStreamRef.current = null;
+    liveAudioRef.current?.pause();
+    liveAudioRef.current = null;
+    if (liveAudioUrlRef.current) URL.revokeObjectURL(liveAudioUrlRef.current);
+    liveAudioUrlRef.current = "";
     if (typeof window !== "undefined") window.speechSynthesis?.cancel();
     setAiVoiceStatus("idle");
   }
 
-  function speakAssistant(text: string, resumeListening: boolean) {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
-      setAiVoiceStatus("idle");
-      if (resumeListening && liveConversationRef.current) beginLiveListening();
-      return;
-    }
+  function finishAssistantSpeech(resumeListening: boolean) {
+    setAiVoiceStatus("idle");
+    if (resumeListening && liveConversationRef.current) void beginLiveListening();
+  }
+
+  function browserSpeechFallback(text: string, resumeListening: boolean) {
+    if (!("speechSynthesis" in window)) return finishAssistantSpeech(resumeListening);
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = speechLanguage;
+    utterance.lang = aiSpeechLanguage;
     utterance.rate = 0.94;
     const matchingVoice = window.speechSynthesis
       .getVoices()
-      .find((voice) => voice.lang.toLowerCase().startsWith(speechLanguage.split("-")[0].toLowerCase()));
+      .find((voice) => voice.lang.toLowerCase().startsWith(aiSpeechLanguage.split("-")[0].toLowerCase()));
     if (matchingVoice) utterance.voice = matchingVoice;
     setAiVoiceStatus("speaking");
-    utterance.onend = () => {
-      setAiVoiceStatus("idle");
-      if (resumeListening && liveConversationRef.current) beginLiveListening();
-    };
-    utterance.onerror = () => {
-      setAiVoiceStatus("idle");
-      if (resumeListening && liveConversationRef.current) beginLiveListening();
-    };
+    utterance.onend = () => finishAssistantSpeech(resumeListening);
+    utterance.onerror = () => finishAssistantSpeech(resumeListening);
     window.speechSynthesis.speak(utterance);
   }
 
-  function beginLiveListening() {
+  async function speakAssistant(text: string, resumeListening: boolean) {
+    if (typeof window === "undefined") return;
+    setAiVoiceStatus("speaking");
+    try {
+      const selectedLanguage = conversationLanguages.find(([code]) => code === aiSpeechLanguage)?.[1] || languageName;
+      const response = await fetch("/api/voice/speech", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, languageName: selectedLanguage, voice: aiVoice }),
+      });
+      if (!response.ok) throw new Error("premium speech unavailable");
+      const blob = await response.blob();
+      if (liveAudioUrlRef.current) URL.revokeObjectURL(liveAudioUrlRef.current);
+      const url = URL.createObjectURL(blob);
+      liveAudioUrlRef.current = url;
+      const audio = new Audio(url);
+      liveAudioRef.current = audio;
+      audio.onended = () => finishAssistantSpeech(resumeListening);
+      audio.onerror = () => browserSpeechFallback(text, resumeListening);
+      await audio.play();
+    } catch {
+      browserSpeechFallback(text, resumeListening);
+    }
+  }
+
+  async function transcribeAndSend(blob: Blob, browserTranscript: string) {
+    let transcript = browserTranscript.trim();
+    try {
+      const form = new FormData();
+      form.append("audio", blob, `answer.${blob.type.includes("mp4") ? "m4a" : "webm"}`);
+      form.append("language", aiSpeechLanguage);
+      const response = await fetch("/api/voice/transcribe", { method: "POST", body: form });
+      const result = (await response.json()) as { text?: string };
+      if (response.ok && result.text?.trim()) transcript = result.text.trim();
+    } catch {
+      // Browser transcript remains the resilient fallback.
+    }
+    if (transcript) await sendConversationTurn(transcript);
+    else {
+      liveConversationRef.current = false;
+      setAiVoiceStatus("error");
+    }
+  }
+
+  async function beginLiveListening() {
+    if (!liveConversationRef.current) return;
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      liveConversationRef.current = false;
+      setAiVoiceStatus("error");
+      return;
+    }
+    mediaStreamRef.current = stream;
+    const mimeType = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"]
+      .find((type) => MediaRecorder.isTypeSupported(type));
+    const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+    mediaRecorderRef.current = recorder;
+    const chunks: Blob[] = [];
+    let browserTranscript = "";
+    let submitted = false;
+    let recognition: SpeechRecognitionLike | null = null;
+    let stopTimer = 0;
+    const stopCapture = () => {
+      if (submitted) return;
+      submitted = true;
+      window.clearTimeout(stopTimer);
+      try { recognition?.stop(); } catch {}
+      if (recorder.state === "recording") recorder.stop();
+    };
+    recorder.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data); };
+    recorder.onstop = () => {
+      stream.getTracks().forEach((track) => track.stop());
+      mediaStreamRef.current = null;
+      mediaRecorderRef.current = null;
+      if (!liveConversationRef.current) return;
+      const audio = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
+      void transcribeAndSend(audio, browserTranscript);
+    };
+    recorder.start(250);
+    setAiVoiceStatus("listening");
+
     const speechWindow = window as typeof window & {
       SpeechRecognition?: new () => SpeechRecognitionLike;
       webkitSpeechRecognition?: new () => SpeechRecognitionLike;
     };
     const Recognition = speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
-    if (!Recognition) {
-      liveConversationRef.current = false;
-      setAiVoiceStatus("error");
-      return;
+    if (Recognition) {
+      recognition = new Recognition();
+      liveRecognitionRef.current = recognition;
+      recognition.lang = aiSpeechLanguage;
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.maxAlternatives = 1;
+      recognition.onresult = (event) => {
+        let interim = "";
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const words = event.results[i][0].transcript;
+          if (event.results[i].isFinal) browserTranscript += `${words} `;
+          else interim += words;
+        }
+        setAiAnswer(`${browserTranscript}${interim}`.trim());
+        if (browserTranscript.trim()) stopCapture();
+      };
+      recognition.onerror = () => { /* The high-accuracy audio transcript still runs. */ };
+      recognition.onend = () => { liveRecognitionRef.current = null; };
+      try { recognition.start(); } catch {}
     }
-    const recognition = new Recognition();
-    liveRecognitionRef.current = recognition;
-    recognition.lang = speechLanguage;
-    recognition.continuous = false;
-    recognition.interimResults = true;
-    recognition.maxAlternatives = 1;
-    let finalText = "";
-    let submitted = false;
-    recognition.onstart = () => setAiVoiceStatus("listening");
-    recognition.onresult = (event) => {
-      let interim = "";
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const words = event.results[i][0].transcript;
-        if (event.results[i].isFinal) finalText += `${words} `;
-        else interim += words;
-      }
-      setAiAnswer(`${finalText}${interim}`.trim());
-      if (finalText.trim() && !submitted) {
-        submitted = true;
-        recognition.stop();
-        void sendConversationTurn(finalText.trim());
-      }
-    };
-    recognition.onerror = () => {
-      setAiVoiceStatus("error");
-      liveConversationRef.current = false;
-    };
-    recognition.onend = () => {
-      liveRecognitionRef.current = null;
-      if (!submitted && liveConversationRef.current) setAiVoiceStatus("idle");
-    };
-    try {
-      recognition.start();
-    } catch {
-      liveConversationRef.current = false;
-      setAiVoiceStatus("error");
-    }
+    stopTimer = window.setTimeout(stopCapture, 9000);
   }
 
   async function sendConversationTurn(rawAnswer?: string) {
@@ -2005,8 +2104,8 @@ function Describe({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userText: answer,
-          language,
-          languageName,
+          language: aiSpeechLanguage.split("-")[0],
+          languageName: conversationLanguages.find(([code]) => code === aiSpeechLanguage)?.[1] || languageName,
           locationMatch: complaintLocationMatch,
           history,
           captured: {
@@ -2053,7 +2152,8 @@ function Describe({
       aiMessagesRef.current = nextMessages;
       setAiMessages(nextMessages);
       setAiComplete(Boolean(result.complete));
-      speakAssistant(result.assistantMessage, !result.complete);
+      if (result.complete) liveConversationRef.current = false;
+      void speakAssistant(result.assistantMessage, !result.complete);
     } catch {
       liveConversationRef.current = false;
       setAiVoiceStatus("error");
@@ -2066,10 +2166,12 @@ function Describe({
       return;
     }
     liveConversationRef.current = true;
+    const languageCode = aiSpeechLanguage.split("-")[0];
+    const opening = voiceOpening[languageCode] || voiceOpening.en;
     const prompt = aiMessagesRef.current.at(-1)?.role === "assistant"
-      ? aiMessagesRef.current.at(-1)?.text || voiceOpening[language]
-      : voiceOpening[language];
-    speakAssistant(prompt, true);
+      ? aiMessagesRef.current.at(-1)?.text || opening
+      : opening;
+    void speakAssistant(prompt, true);
   }
 
   return (
@@ -2116,6 +2218,32 @@ function Describe({
                       : aiVoiceStatus === "error" ? t.aiVoiceError
                         : t.aiVoiceReady}
               </em>
+            </div>
+            <div className="voiceModelSettings">
+              <label>{t.aiLanguageLabel}
+                <select
+                  value={aiSpeechLanguage}
+                  disabled={aiVoiceStatus !== "idle"}
+                  onChange={(e) => {
+                    stopLiveConversation();
+                    const nextLanguage = e.target.value;
+                    setAiSpeechLanguage(nextLanguage);
+                    const opening = voiceOpening[nextLanguage.split("-")[0]] || voiceOpening.en;
+                    setAiMessages([{ role: "assistant", text: opening }]);
+                    setAiComplete(false);
+                  }}
+                >
+                  {conversationLanguages.map(([code, label]) => <option key={code} value={code}>{label}</option>)}
+                </select>
+              </label>
+              <label>{t.aiVoiceLabel}
+                <select value={aiVoice} disabled={aiVoiceStatus !== "idle"} onChange={(e) => setAiVoice(e.target.value)}>
+                  <option value="coral">{t.aiVoiceCoral}</option>
+                  <option value="nova">{t.aiVoiceNova}</option>
+                  <option value="shimmer">{t.aiVoiceShimmer}</option>
+                </select>
+              </label>
+              <span>{t.aiVoiceModelBadge}</span>
             </div>
             <div className="aiChatHistory">
               {aiMessages.map((item, index) => (
