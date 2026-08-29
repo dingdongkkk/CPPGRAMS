@@ -1,0 +1,806 @@
+:root {
+  --dl-navy: #0b2568;
+  --dl-navy-dark: #071948;
+  --dl-blue: #0066cc;
+  --dl-cyan: #00a0e3;
+  --dl-green: #2e8540;
+  --dl-green-light: #eafaf1;
+  --dl-orange: #f26522;
+  --dl-bg: #f4f6fa;
+  --dl-card-bg: #ffffff;
+  --dl-border: #dbe2ea;
+  --dl-text: #1e293b;
+  --dl-text-muted: #64748b;
+  --dl-ring: rgba(0, 102, 204, 0.2);
+}
+
+.dlPortal {
+  min-height: 100vh;
+  background-color: var(--dl-bg);
+  color: var(--dl-text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Top Government Banner */
+.dlGovBanner {
+  background: #061536;
+  color: #c7d2e9;
+  font-size: 11.5px;
+  padding: 6px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.dlGovLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 500;
+}
+
+.dlGovFlag {
+  display: inline-flex;
+  flex-direction: column;
+  width: 14px;
+  height: 10px;
+  border-radius: 1px;
+  overflow: hidden;
+}
+
+.dlGovFlag span:nth-child(1) { background: #ff9933; flex: 1; }
+.dlGovFlag span:nth-child(2) { background: #ffffff; flex: 1; }
+.dlGovFlag span:nth-child(3) { background: #138808; flex: 1; }
+
+.dlGovRight {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 11px;
+}
+
+.dlGovRight span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* Main Brand Header */
+.dlHeader {
+  background: #ffffff;
+  border-bottom: 1px solid var(--dl-border);
+  padding: 12px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+}
+
+.dlBrand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  text-decoration: none;
+}
+
+.dlLogoEmblem {
+  width: 42px;
+  height: 42px;
+  background: linear-gradient(135deg, var(--dl-navy) 0%, var(--dl-blue) 100%);
+  color: #fff;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  font-size: 22px;
+  box-shadow: 0 4px 12px rgba(0, 46, 173, 0.25);
+}
+
+.dlBrandText h1 {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--dl-navy);
+  margin: 0;
+  line-height: 1.1;
+  letter-spacing: -0.3px;
+}
+
+.dlBrandText h1 span {
+  color: var(--dl-cyan);
+}
+
+.dlBrandText p {
+  font-size: 10.5px;
+  color: var(--dl-text-muted);
+  margin: 2px 0 0;
+  letter-spacing: 0.2px;
+}
+
+.dlHeaderBadge {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.meriPehchanBadge {
+  background: linear-gradient(135deg, #f0f7ff 0%, #e0efff 100%);
+  border: 1px solid #bfdbfe;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #1d4ed8;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.simBadge {
+  background: #fef3c7;
+  border: 1px solid #fde68a;
+  color: #92400e;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Body Container */
+.dlMain {
+  flex: 1;
+  max-width: 920px;
+  width: 100%;
+  margin: 28px auto 40px;
+  padding: 0 20px;
+}
+
+/* Wizard Steps Indicator */
+.dlStepper {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  position: relative;
+  background: #ffffff;
+  padding: 16px 20px;
+  border-radius: 14px;
+  border: 1px solid var(--dl-border);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+}
+
+.dlStepItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+  z-index: 2;
+  opacity: 0.5;
+  transition: all 0.25s ease;
+}
+
+.dlStepItem.active {
+  opacity: 1;
+}
+
+.dlStepItem.completed {
+  opacity: 1;
+}
+
+.dlStepNum {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #e2e8f0;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+}
+
+.dlStepItem.active .dlStepNum {
+  background: var(--dl-blue);
+  color: #ffffff;
+  box-shadow: 0 0 0 4px var(--dl-ring);
+}
+
+.dlStepItem.completed .dlStepNum {
+  background: var(--dl-green);
+  color: #ffffff;
+}
+
+.dlStepLabel {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--dl-text);
+}
+
+.dlStepItem.active .dlStepLabel {
+  color: var(--dl-blue);
+  font-weight: 700;
+}
+
+/* Card Container */
+.dlCard {
+  background: var(--dl-card-bg);
+  border-radius: 16px;
+  border: 1px solid var(--dl-border);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+}
+
+.dlCardHeader {
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  border-bottom: 1px solid var(--dl-border);
+  padding: 18px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.dlCardHeader h2 {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--dl-navy);
+  margin: 0;
+}
+
+.dlCardHeader p {
+  font-size: 12px;
+  color: var(--dl-text-muted);
+  margin: 3px 0 0;
+}
+
+.dlCardBody {
+  padding: 26px;
+}
+
+/* Tab Switcher */
+.dlTabs {
+  display: flex;
+  background: #f1f5f9;
+  padding: 4px;
+  border-radius: 10px;
+  gap: 4px;
+  margin-bottom: 22px;
+}
+
+.dlTabBtn {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dl-text-muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.dlTabBtn.active {
+  background: #ffffff;
+  color: var(--dl-navy);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+/* Persona Grid */
+.dlPersonaGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+  margin-bottom: 22px;
+}
+
+.dlPersonaCard {
+  border: 2px solid var(--dl-border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
+}
+
+.dlPersonaCard:hover {
+  border-color: #93c5fd;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 102, 204, 0.08);
+}
+
+.dlPersonaCard.selected {
+  border-color: var(--dl-blue);
+  background: #f0f7ff;
+  box-shadow: 0 0 0 1px var(--dl-blue), 0 6px 18px rgba(0, 102, 204, 0.12);
+}
+
+.dlPersonaTop {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dlPersonaAvatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: #e2e8f0;
+  object-fit: cover;
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.dlPersonaMeta b {
+  display: block;
+  font-size: 14px;
+  color: var(--dl-navy);
+}
+
+.dlPersonaMeta small {
+  font-size: 11px;
+  color: var(--dl-text-muted);
+}
+
+.dlPersonaAadhaar {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11.5px;
+  background: #ffffff;
+  border: 1px dashed #cbd5e1;
+  padding: 5px 8px;
+  border-radius: 6px;
+  color: #334155;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.dlPersonaCard.selected .dlPersonaAadhaar {
+  background: #e0efff;
+  border-color: #93c5fd;
+}
+
+.dlPersonaDocs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.dlDocPill {
+  font-size: 10px;
+  background: #f1f5f9;
+  color: #475569;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.dlPersonaCard.selected .dlDocPill {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+/* Custom Form */
+.dlFormGroup {
+  margin-bottom: 16px;
+}
+
+.dlFormRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.dlLabel {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: #334155;
+  margin-bottom: 6px;
+}
+
+.dlInput, .dlSelect {
+  width: 100%;
+  border: 1px solid var(--dl-border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13.5px;
+  color: var(--dl-text);
+  background: #ffffff;
+  outline: none;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.dlInput:focus, .dlSelect:focus {
+  border-color: var(--dl-blue);
+  box-shadow: 0 0 0 3px var(--dl-ring);
+}
+
+.dlPinWrapper {
+  position: relative;
+}
+
+.dlPinToggle {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--dl-text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Actions & Buttons */
+.dlBtnPrimary {
+  background: linear-gradient(180deg, var(--dl-blue) 0%, #0052a3 100%);
+  color: #ffffff;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 4px 12px rgba(0, 102, 204, 0.25);
+  width: 100%;
+}
+
+.dlBtnPrimary:hover {
+  background: linear-gradient(180deg, #0073e6 0%, #0059b3 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(0, 102, 204, 0.32);
+}
+
+.dlBtnPrimary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.dlBtnSecondary {
+  background: #f1f5f9;
+  color: #334155;
+  border: 1px solid var(--dl-border);
+  padding: 12px 20px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.dlBtnSecondary:hover {
+  background: #e2e8f0;
+  color: #1e293b;
+}
+
+/* SMS Notification Simulator */
+.dlSmsToast {
+  background: #0f172a;
+  color: #f8fafc;
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  border: 1px solid #334155;
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.dlSmsLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dlSmsIcon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: #2563eb;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+}
+
+.dlSmsText b {
+  display: block;
+  font-size: 11px;
+  color: #94a3b8;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.dlSmsText p {
+  font-size: 12.5px;
+  margin: 2px 0 0;
+  color: #f1f5f9;
+}
+
+.dlSmsText mark {
+  background: #3b82f6;
+  color: #ffffff;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 700;
+}
+
+.dlSmsCopyBtn {
+  background: #1e293b;
+  border: 1px solid #475569;
+  color: #93c5fd;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.dlSmsCopyBtn:hover {
+  background: #334155;
+}
+
+/* OTP Boxes */
+.dlOtpContainer {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin: 20px 0;
+}
+
+.dlOtpBox {
+  width: 48px;
+  height: 54px;
+  border: 2px solid var(--dl-border);
+  border-radius: 10px;
+  text-align: center;
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--dl-navy);
+  outline: none;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.dlOtpBox:focus {
+  border-color: var(--dl-blue);
+  box-shadow: 0 0 0 3px var(--dl-ring);
+  transform: translateY(-2px);
+}
+
+/* Consent Screen */
+.dlConsentHeader {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: #f8fafc;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid var(--dl-border);
+  margin-bottom: 20px;
+}
+
+.dlConsentAvatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.dlConsentUser b {
+  font-size: 16px;
+  color: var(--dl-navy);
+  display: block;
+}
+
+.dlConsentUser p {
+  font-size: 12px;
+  color: var(--dl-text-muted);
+  margin: 2px 0 0;
+}
+
+.dlScopeBox {
+  border: 1px solid #bfdbfe;
+  background: #f0f7ff;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.dlScopeBox h3 {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e40af;
+  margin: 0 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dlScopeList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dlScopeItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 12.5px;
+  color: #1e3a8a;
+}
+
+.dlScopeIcon {
+  color: #2563eb;
+  font-size: 14px;
+  margin-top: 1px;
+}
+
+/* Fetch & Sync Loading Screen */
+.dlSyncShell {
+  text-align: center;
+  padding: 30px 10px;
+}
+
+.dlSyncSpinner {
+  width: 56px;
+  height: 56px;
+  border: 4px solid #e2e8f0;
+  border-top-color: var(--dl-blue);
+  border-radius: 50%;
+  margin: 0 auto 24px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.dlSyncShell h3 {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--dl-navy);
+  margin: 0 0 8px;
+}
+
+.dlSyncShell p {
+  font-size: 13px;
+  color: var(--dl-text-muted);
+  margin: 0 0 28px;
+}
+
+.dlSyncSteps {
+  max-width: 480px;
+  margin: 0 auto;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dlSyncStep {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #f8fafc;
+  padding: 12px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--dl-border);
+  font-size: 13px;
+  color: #475569;
+  transition: all 0.3s ease;
+}
+
+.dlSyncStep.done {
+  background: var(--dl-green-light);
+  border-color: #bbf7d0;
+  color: #166534;
+  font-weight: 600;
+}
+
+.dlSyncStep.active {
+  border-color: var(--dl-blue);
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.dlSyncStepIcon {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  background: #e2e8f0;
+  color: #64748b;
+}
+
+.dlSyncStep.done .dlSyncStepIcon {
+  background: var(--dl-green);
+  color: #ffffff;
+}
+
+.dlSyncStep.active .dlSyncStepIcon {
+  background: var(--dl-blue);
+  color: #ffffff;
+}
+
+/* Footer */
+.dlFooter {
+  background: #ffffff;
+  border-top: 1px solid var(--dl-border);
+  padding: 20px 24px;
+  text-align: center;
+  font-size: 11.5px;
+  color: var(--dl-text-muted);
+  margin-top: auto;
+}
+
+.dlFooterLinks {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  margin-bottom: 8px;
+}
+
+.dlFooterLinks a {
+  color: var(--dl-blue);
+  text-decoration: none;
+}
+
+.dlFooterLinks a:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 640px) {
+  .dlStepper {
+    display: none;
+  }
+  .dlFormRow {
+    grid-template-columns: 1fr;
+  }
+  .dlPersonaGrid {
+    grid-template-columns: 1fr;
+  }
+  .dlGovBanner {
+    display: none;
+  }
+}

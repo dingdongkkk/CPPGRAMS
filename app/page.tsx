@@ -36,6 +36,7 @@ import {
   IconStop,
 } from "./icons";
 import ProcessCarousel from "./ProcessCarousel";
+import { DigiCitizenProfile, DigiDocument } from "./digilocker/data";
 
 type Screen =
   | "home"
@@ -292,6 +293,8 @@ export default function Home() {
   const [permissionPrompt, setPermissionPrompt] = useState(true);
   const [showSecurityGate, setShowSecurityGate] = useState(false);
   const [digiVerified, setDigiVerified] = useState(false);
+  const [digiProfile, setDigiProfile] = useState<DigiCitizenProfile | null>(null);
+  const [viewingDocs, setViewingDocs] = useState<DigiDocument[] | null>(null);
   const [captchaToken, setCaptchaToken] = useState("");
   const [captchaMode, setCaptchaMode] = useState<"demo" | "live">("demo");
   const [securityLoading, setSecurityLoading] = useState(false);
@@ -332,6 +335,54 @@ export default function Home() {
       setAccount(savedAccount);
       setName(savedAccount);
     }
+
+    const loadDigiProfile = async () => {
+      try {
+        const res = await fetch("/api/digilocker/session");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.authenticated && data.profile) {
+            setDigiVerified(true);
+            setDigiProfile(data.profile);
+            if (data.profile.name) {
+              setName(data.profile.name);
+              setAccount(data.profile.name);
+            }
+            if (data.profile.district || data.profile.locality) {
+              setDetails((prev) => ({
+                ...prev,
+                district: prev.district || data.profile.district || "",
+                locality: prev.locality || data.profile.locality || "",
+              }));
+              if (data.profile.state) setSelectedState((prev) => prev || data.profile.state);
+            }
+            return;
+          }
+        }
+      } catch {}
+
+      const localProfileStr = localStorage.getItem("jansetu_digilocker_profile");
+      if (localProfileStr) {
+        try {
+          const p = JSON.parse(localProfileStr) as DigiCitizenProfile;
+          setDigiVerified(true);
+          setDigiProfile(p);
+          if (p.name) {
+            setName(p.name);
+            setAccount(p.name);
+          }
+          if (p.district || p.locality) {
+            setDetails((prev) => ({
+              ...prev,
+              district: prev.district || p.district || "",
+              locality: prev.locality || p.locality || "",
+            }));
+            if (p.state) setSelectedState((prev) => prev || p.state);
+          }
+        } catch {}
+      }
+    };
+
     setReady(true);
     const params = new URLSearchParams(window.location.search);
     if (
@@ -340,7 +391,10 @@ export default function Home() {
     ) {
       setDigiVerified(true);
       setShowSecurityGate(true);
+      loadDigiProfile();
       window.history.replaceState({}, "", "/");
+    } else {
+      loadDigiProfile();
     }
   }, []);
   useEffect(() => {
@@ -906,6 +960,8 @@ export default function Home() {
           <SecurityGate
             t={t}
             digiVerified={digiVerified}
+            digiProfile={digiProfile}
+            onViewDocs={(docs) => setViewingDocs(docs)}
             captchaToken={captchaToken}
             setCaptchaToken={setCaptchaToken}
             captchaMode={captchaMode}
@@ -913,6 +969,12 @@ export default function Home() {
             loading={securityLoading}
             close={() => setShowSecurityGate(false)}
             complete={completeSecurityCheck}
+          />
+        )}
+        {viewingDocs && (
+          <DigiDocModal
+            documents={viewingDocs}
+            close={() => setViewingDocs(null)}
           />
         )}
         {showTrackingLookup && (
@@ -1095,6 +1157,8 @@ export default function Home() {
           submit={submitGrievance}
           name={name}
           setName={setName}
+          digiProfile={digiProfile}
+          onViewDocs={(docs) => setViewingDocs(docs)}
           t={t}
           details={details}
           submitting={submitting}
@@ -1148,6 +1212,12 @@ export default function Home() {
           rating={processRating}
           setRating={setProcessRating}
           resolutionFeedback={resolutionFeedback}
+        />
+      )}
+      {viewingDocs && (
+        <DigiDocModal
+          documents={viewingDocs}
+          close={() => setViewingDocs(null)}
         />
       )}
     </main>
@@ -1286,6 +1356,8 @@ function TrackingLookup({
 function SecurityGate({
   t,
   digiVerified,
+  digiProfile,
+  onViewDocs,
   captchaToken,
   setCaptchaToken,
   captchaMode,
@@ -1296,6 +1368,8 @@ function SecurityGate({
 }: {
   t: Dict;
   digiVerified: boolean;
+  digiProfile?: DigiCitizenProfile | null;
+  onViewDocs?: (docs: DigiDocument[]) => void;
   captchaToken: string;
   setCaptchaToken: (v: string) => void;
   captchaMode: "demo" | "live";
@@ -1332,14 +1406,79 @@ function SecurityGate({
             </div>
             <p>{t.secStep1Body}</p>
             {digiVerified ? (
-              <div className="verifiedIdentity">
-                <b><IconCheck size={14} />{t.secVerifiedOk}</b>
-                <small>
-                  {captchaMode === "demo"
-                    ? t.secDemoIdentity
-                    : t.secLiveIdentity}
-                </small>
-              </div>
+              digiProfile ? (
+                <div className="dlCitizenBox">
+                  <div className="dlCitizenTop">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={digiProfile.photoAvatar}
+                      alt={digiProfile.name}
+                      className="dlCitizenAvatar"
+                    />
+                    <div className="dlCitizenNameBlock">
+                      <b>
+                        {digiProfile.name}{" "}
+                        <span className="dlKycTag">UIDAI e-KYC VERIFIED</span>
+                      </b>
+                      <small>
+                        {digiProfile.age} Yrs · {digiProfile.gender} · {digiProfile.aadhaarMasked}
+                      </small>
+                    </div>
+                  </div>
+                  <div className="dlCitizenGrid">
+                    <div>
+                      <span>Aadhaar No</span>
+                      <b>{digiProfile.aadhaarMasked}</b>
+                    </div>
+                    <div>
+                      <span>Contact No</span>
+                      <b>{digiProfile.mobileMasked}</b>
+                    </div>
+                    <div>
+                      <span>District & State</span>
+                      <b>
+                        {digiProfile.district}, {digiProfile.state}
+                      </b>
+                    </div>
+                    <div>
+                      <span>Address</span>
+                      <b>{digiProfile.address}</b>
+                    </div>
+                  </div>
+                  {digiProfile.documents && digiProfile.documents.length > 0 && (
+                    <div className="dlCitizenDocsRow">
+                      {digiProfile.documents.map((d) => (
+                        <span key={d.id} className="dlDocBadge">
+                          ✓ {d.name}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <div className="dlCitizenActions">
+                    {digiProfile.documents && digiProfile.documents.length > 0 && (
+                      <button
+                        type="button"
+                        className="dlActionBtn"
+                        onClick={() => onViewDocs?.(digiProfile.documents)}
+                      >
+                        📄 View Synced Docs ({digiProfile.documents.length})
+                      </button>
+                    )}
+                    <a className="dlSwitchLink" href="/digilocker?return_to=/">
+                      Switch / Re-authenticate ↗
+                    </a>
+                  </div>
+                </div>
+              ) : (
+                <div className="verifiedIdentity">
+                  <b><IconCheck size={14} />{t.secVerifiedOk}</b>
+                  <small>
+                    {captchaMode === "demo"
+                      ? t.secDemoIdentity
+                      : t.secLiveIdentity}
+                  </small>
+                </div>
+              )
             ) : (
               <a className="digiButton" href="/api/digilocker/start">
                 <span className="digiMark">D</span>
@@ -1383,6 +1522,62 @@ function SecurityGate({
           <IconArrowRight size={16} />
         </button>
       </section>
+    </div>
+  );
+}
+
+function DigiDocModal({
+  documents,
+  close,
+}: {
+  documents: DigiDocument[];
+  close: () => void;
+}) {
+  return (
+    <div className="dlDocModalOverlay" role="dialog" aria-modal="true">
+      <div className="dlDocModalBox">
+        <div className="dlDocModalHead">
+          <h3>
+            <span>📜</span> DigiLocker Verified Documents ({documents.length})
+          </h3>
+          <button className="gateClose" onClick={close} aria-label="Close">
+            <IconClose size={18} />
+          </button>
+        </div>
+
+        {documents.map((doc) => (
+          <div key={doc.id} className="dlDocCard">
+            <div className="dlDocCardTop">
+              <div>
+                <b>{doc.name}</b>
+                <div className="dlDocIssuer">{doc.issuer}</div>
+              </div>
+              <span className="dlKycTag">DIGILOCKER VERIFIED</span>
+            </div>
+
+            <div style={{ fontSize: "11px", color: "#475569", marginBottom: "6px" }}>
+              <b>Doc / Reg No:</b> {doc.docNumber} · <b>Issued:</b> {doc.issueDate}
+            </div>
+
+            {doc.details && Object.keys(doc.details).length > 0 && (
+              <dl className="dlDocDetailsGrid">
+                {Object.entries(doc.details).map(([key, val]) => (
+                  <div key={key}>
+                    <dt>{key}</dt>
+                    <dd>{val}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+          </div>
+        ))}
+
+        <div style={{ marginTop: "16px", textAlign: "right" }}>
+          <button type="button" className="primary compact" onClick={close}>
+            Done / Close
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -2566,6 +2761,8 @@ function Review({
   submitting,
   name,
   setName,
+  digiProfile,
+  onViewDocs,
 }: {
   name: string;
   setName: (v: string) => void;
@@ -2576,6 +2773,8 @@ function Review({
   t: Dict;
   details: ComplaintDetails;
   submitting: boolean;
+  digiProfile?: DigiCitizenProfile | null;
+  onViewDocs?: (docs: DigiDocument[]) => void;
 }) {
   return (
     <section className="singleCard">
@@ -2665,6 +2864,35 @@ function Review({
         onChange={(e) => setAnalysis({ ...analysis, summary: e.target.value })}
       />
       <div className="humanCheck">✓ {t.humanCheck}</div>
+
+      {digiProfile && (
+        <div className="dlCitizenBox" style={{ margin: "16px 0" }}>
+          <div className="dlCitizenTop">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={digiProfile.photoAvatar} alt={digiProfile.name} className="dlCitizenAvatar" />
+            <div className="dlCitizenNameBlock">
+              <b>{digiProfile.name} <span className="dlKycTag">UIDAI e-KYC VERIFIED</span></b>
+              <small>Aadhaar: {digiProfile.aadhaarMasked} · {digiProfile.age} Yrs · {digiProfile.gender}</small>
+            </div>
+            {digiProfile.documents && digiProfile.documents.length > 0 && (
+              <button
+                type="button"
+                className="dlActionBtn"
+                onClick={() => onViewDocs?.(digiProfile.documents)}
+              >
+                📄 View Synced Docs ({digiProfile.documents.length})
+              </button>
+            )}
+          </div>
+          <div className="dlCitizenGrid">
+            <div><span>Aadhaar Number</span><b>{digiProfile.aadhaarMasked}</b></div>
+            <div><span>Verified Contact</span><b>{digiProfile.mobileMasked}</b></div>
+            <div><span>District & State</span><b>{digiProfile.district}, {digiProfile.state}</b></div>
+            <div><span>Residential Address</span><b>{digiProfile.address}</b></div>
+          </div>
+        </div>
+      )}
+
       <div className="filerBlock">
         <label htmlFor="filerName">{t.filerName}</label>
         <input

@@ -120,3 +120,30 @@ export const activityLog = pgTable("activity_log", {
   detail: text("detail").notNull().default(""),
   createdAt: text("created_at").notNull().default(nowText),
 });
+
+export const digilockerProfiles = pgTable(
+  "digilocker_profiles",
+  {
+    id: serial("id").primaryKey(),
+    sessionId: text("session_id").notNull(),
+    aadhaarMasked: text("aadhaar_masked").notNull(),
+    name: text("name").notNull(),
+    gender: text("gender").notNull(),
+    dob: text("dob").notNull(),
+    age: integer("age").notNull(),
+    mobileMasked: text("mobile_masked").notNull(),
+    email: text("email").notNull().default(""),
+    address: text("address").notNull(),
+    locality: text("locality").notNull().default(""),
+    district: text("district").notNull().default(""),
+    state: text("state").notNull().default(""),
+    pincode: text("pincode").notNull().default(""),
+    documentsJson: text("documents_json").notNull().default("[]"),
+    photoAvatar: text("photo_avatar").notNull().default(""),
+    createdAt: text("created_at")
+      .notNull()
+      .default(nowText),
+  },
+  (table) => [uniqueIndex("idx_digilocker_session_id").on(table.sessionId)],
+);
+
