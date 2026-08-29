@@ -184,7 +184,7 @@ const hi: Partial<Dict> = {
   helpBody: "प्रोटोटाइप सहायता लाइन: 1800-000-000",
 
   rvFound: "हमें सही रास्ता मिल गया",
-  rvClassified: "OpenAI द्वारा वर्गीकृत · कृपया पुष्टि करें",
+  rvClassified: "Groq Nemotron द्वारा वर्गीकृत · कृपया पुष्टि करें",
   rvPreview: "AI-सहायता से विभाग चुना गया · भेजने से पहले जाँचें",
   aiAssisted: "AI सहायता प्राप्त",
   rvUrgency: "AI प्राथमिकता",

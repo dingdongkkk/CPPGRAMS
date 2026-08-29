@@ -377,7 +377,7 @@ const en = {
 
   // ── Review screen ────────────────────────────────────────────────
   rvFound: "We found the right route",
-  rvClassified: "Classified by OpenAI · Please confirm",
+  rvClassified: "Classified by AI (Groq Nemotron) · Please confirm",
   rvPreview: "AI-assisted routing preview · Review before submitting",
   aiAssisted: "AI ASSISTED",
   rvUrgency: "AI urgency",

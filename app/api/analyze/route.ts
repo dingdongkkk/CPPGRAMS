@@ -137,49 +137,51 @@ export async function POST(request: Request) {
     );
   }
 
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY;
   if (!apiKey)
     return Response.json({
       ...fallbackAnalysis(description, state, details),
       source: "rules",
     });
 
+  const groqBaseUrl = process.env.GROQ_BASE_URL || "https://api.groq.com/openai/v1";
+  const model = process.env.GROQ_MODEL || "nvidia/llama-3.1-nemotron-70b-instruct";
+
   try {
-    const response = await fetch("https://api.openai.com/v1/responses", {
+    const systemPrompt = `You triage and route Indian public grievances. First determine urgency as Critical, High, Medium, or Low. Critical is only for a plausible immediate threat to life or public safety; set emergencyWarning true for Critical and explain that grievance filing does not replace emergency services. Then choose the category and correct department. Respect Indian federal jurisdiction: state and local service issues must go to the concerned State/UT authority, while central services go to the appropriate Government of India ministry. Never route to a Delhi-specific body unless the location is Delhi. Assign an officer role, not an invented person's name: District Emergency Nodal Officer for Critical, District Grievance Officer — Priority Desk for High, Department Grievance Officer for Medium, and Block / Tehsil Grievance Officer for Low. Extract only information present in the citizen text. Use plain, neutral language. Draft a concise first-person grievance summary for citizen review.
+
+You must respond ONLY with a valid JSON object matching this schema:
+${JSON.stringify(schema, null, 2)}`;
+
+    const userPrompt = `Citizen-selected State/UT: ${state || "Not selected"}\nStructured complaint fields: ${JSON.stringify(details || {})}\nComplaint: ${description}`;
+
+    const response = await fetch(`${groqBaseUrl}/chat/completions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "gpt-5-mini",
-        store: false,
-        instructions:
-          "You triage and route Indian public grievances. First determine urgency as Critical, High, Medium, or Low. Critical is only for a plausible immediate threat to life or public safety; set emergencyWarning true for Critical and explain that grievance filing does not replace emergency services. Then choose the category and correct department. Respect Indian federal jurisdiction: state and local service issues must go to the concerned State/UT authority, while central services go to the appropriate Government of India ministry. Never route to a Delhi-specific body unless the location is Delhi. Assign an officer role, not an invented person's name: District Emergency Nodal Officer for Critical, District Grievance Officer — Priority Desk for High, Department Grievance Officer for Medium, and Block / Tehsil Grievance Officer for Low. Extract only information present in the citizen text. Use plain, neutral language. Draft a concise first-person grievance summary for citizen review.",
-        input: `Citizen-selected State/UT: ${state || "Not selected"}\nStructured complaint fields: ${JSON.stringify(details || {})}\nComplaint: ${description}`,
-        text: {
-          format: {
-            type: "json_schema",
-            name: "grievance_analysis",
-            strict: true,
-            schema,
-          },
-        },
+        model,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.1,
       }),
     });
-    if (!response.ok)
-      throw new Error(`OpenAI request failed: ${response.status}`);
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Groq request failed: ${response.status} ${errText}`);
+    }
     const result = (await response.json()) as {
-      output?: Array<{
-        type: string;
-        content?: Array<{ type: string; text?: string }>;
-      }>;
+      choices?: Array<{ message?: { content?: string } }>;
     };
-    const outputText = result.output
-      ?.flatMap((item) => item.content ?? [])
-      .find((item) => item.type === "output_text")?.text;
-    if (!outputText) throw new Error("No structured output returned");
-    return Response.json({ ...JSON.parse(outputText), source: "openai" });
+    const content = result.choices?.[0]?.message?.content;
+    if (!content) throw new Error("No structured output returned from Groq");
+    const cleanJson = content.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+    return Response.json({ ...JSON.parse(cleanJson), source: "groq" });
   } catch (error) {
     console.error(
       "AI classification unavailable; returning rules-based analysis",
