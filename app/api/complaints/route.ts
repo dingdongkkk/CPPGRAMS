@@ -1,6 +1,8 @@
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq, or } from "drizzle-orm";
 import { getDb } from "../../../db";
-import { complaints } from "../../../db/schema";
+import { activityLog, complaints } from "../../../db/schema";
+import { currentUser } from "../../lib/auth";
+import { getDepartmentOfficer, getSlaDays } from "../../lib/officerDirectory";
 
 type JourneyUpdate = {
   title: string;
@@ -31,11 +33,6 @@ function issueNumber() {
 
 function databaseError(error: unknown) {
   const message = error instanceof Error ? error.message : "Database unavailable";
-  // The citizen sees a friendly line, but the operator needs the real cause:
-  // without this, a bad connection string and a missing table are
-  // indistinguishable from the outside.
-  // drizzle wraps driver failures, so the useful part (auth failure, DNS,
-  // missing relation) lives on `cause` rather than the top-level message.
   const cause = error instanceof Error ? (error.cause as Error | undefined) : undefined;
   console.error(
     "[complaints] db error |",
@@ -44,9 +41,6 @@ function databaseError(error: unknown) {
     "| cause:", cause?.message ?? "(none)",
     "| msg:", message.slice(0, 120),
   );
-  // Postgres phrases a missing table as `relation "..." does not exist`,
-  // where D1/SQLite said `no such table`. Both are matched so the friendlier
-  // "being prepared" message still shows before migrations have run.
   const missingTable =
     /no such table/i.test(message) || /relation .* does not exist/i.test(message);
   return missingTable
@@ -86,8 +80,11 @@ function buildJourney(category: string, department: string, location: string, se
 
 export async function POST(request: Request) {
   const cookie = request.headers.get("cookie") || "";
-  if (!cookie.includes("jansetu_human=1") || !cookie.includes("jansetu_digilocker=")) {
-    return Response.json({ error: "Verification is required." }, { status: 403 });
+  const user = await currentUser(request);
+
+  // Verification is required: either verified user session, human+digilocker cookies, or verified identity
+  if (!user && (!cookie.includes("jansetu_human=1") || !cookie.includes("jansetu_digilocker="))) {
+    return Response.json({ error: "Identity verification is required before filing." }, { status: 403 });
   }
 
   try {
@@ -99,17 +96,31 @@ export async function POST(request: Request) {
       urgency?: string;
       urgencyReason?: string;
       assignedOfficer?: string;
+      description?: string;
+      ministry?: string;
+      mainCategory?: string;
+      subCategory?: string;
+      referenceNumber?: string;
+      referenceDate?: string;
+      gender?: string;
+      address?: string;
+      email?: string;
+      mobile?: string;
     };
-    const filerName = payload.filerName?.trim().replace(/\s+/g, " ") || "";
+    const filerName = (payload.filerName || user?.fullName || "").trim().replace(/\s+/g, " ");
     if (
       filerName.length < 2 ||
       !payload.department ||
       !payload.category ||
-      !["Critical", "High", "Medium", "Low"].includes(payload.urgency || "") ||
-      !payload.assignedOfficer
+      !["Critical", "High", "Medium", "Low"].includes(payload.urgency || "")
     ) {
-      return Response.json({ error: "Name and complaint details are required." }, { status: 400 });
+      return Response.json({ error: "Name, department, and valid urgency are required." }, { status: 400 });
     }
+
+    const urgency = payload.urgency || "Medium";
+    const officer = getDepartmentOfficer(payload.department, payload.category);
+    const slaDays = getSlaDays(urgency);
+    const slaDeadline = new Date(Date.now() + slaDays * 86_400_000).toISOString();
 
     const db = getDb();
     for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -121,21 +132,58 @@ export async function POST(request: Request) {
           .values({
             issueNumber: number,
             filerNameHash: await hashName(filerName),
+            userId: user?.id ?? null,
             department: payload.department,
             category: payload.category,
             location: payload.location || "Location not provided",
-            urgency: payload.urgency,
+            urgency,
             urgencyReason: payload.urgencyReason || "AI urgency assessment completed",
-            assignedOfficer: payload.assignedOfficer,
+            assignedOfficer: payload.assignedOfficer || officer.officerDesignation,
+            officerName: officer.officerName,
+            officerDesignation: officer.officerDesignation,
+            officerEmail: officer.officerEmail,
+            officerPhone: officer.officerPhone,
+            officerOffice: officer.officerOffice,
+            appellateOfficerName: officer.appellateOfficerName,
+            appellateOfficerDesignation: officer.appellateOfficerDesignation,
+            appellateOfficerEmail: officer.appellateOfficerEmail,
+            appellateOfficerPhone: officer.appellateOfficerPhone,
+            slaDeadline,
+            slaDays,
             status: "Assigned to officer",
             stage: 1,
             journeyJson: JSON.stringify(journey),
+            description: (payload.description || "").slice(0, 2000),
+            ministry: payload.ministry || payload.department,
+            mainCategory: payload.mainCategory || payload.category,
+            subCategory: payload.subCategory || "",
+            referenceNumber: payload.referenceNumber || "",
+            referenceDate: payload.referenceDate || "",
+            gender: payload.gender || user?.gender || "",
+            address: payload.address || user?.address || "",
+            email: payload.email || user?.email || "",
+            mobile: payload.mobile || user?.mobile || "",
           })
-          .returning({ issueNumber: complaints.issueNumber, createdAt: complaints.createdAt, journeyJson: complaints.journeyJson });
-        return Response.json({ complaint: record }, { status: 201 });
+          .returning();
+
+        if (user) {
+          await db.insert(activityLog).values({
+            userId: user.id,
+            action: "Grievance filed",
+            detail: `${record.issueNumber} — ${record.category} (${record.department})`,
+          });
+        }
+
+        return Response.json(
+          {
+            complaint: {
+              ...record,
+              journey: JSON.parse(record.journeyJson || "[]"),
+            },
+          },
+          { status: 201 },
+        );
       } catch (error) {
-        // SQLite raised "UNIQUE constraint failed"; Postgres raises
-        // "duplicate key value violates unique constraint".
         const collision = /unique|duplicate key/i.test(String(error));
         if (collision && attempt < 2) continue;
         throw error;
@@ -149,44 +197,90 @@ export async function POST(request: Request) {
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
+  const user = await currentUser(request);
+  const mine = url.searchParams.get("mine") === "1";
   const issue = (url.searchParams.get("issue") || "").trim().toUpperCase();
   const name = normalizeName(url.searchParams.get("name") || "");
-  if (name.length < 2 || (issue && !/^JS-\d{4}-[A-Z0-9]{5}-[A-Z0-9]{5}$/.test(issue))) {
-    return Response.json({ error: "Enter a valid issue number and filer name." }, { status: 400 });
-  }
 
   try {
     const db = getDb();
-    const fields = {
-      issueNumber: complaints.issueNumber,
-      department: complaints.department,
-      category: complaints.category,
-      location: complaints.location,
-      urgency: complaints.urgency,
-      urgencyReason: complaints.urgencyReason,
-      assignedOfficer: complaints.assignedOfficer,
-      status: complaints.status,
-      stage: complaints.stage,
-      createdAt: complaints.createdAt,
-      journeyJson: complaints.journeyJson,
-    };
-    const records = await db
-      .select({
-        ...fields,
-      })
-      .from(complaints)
-      .where(and(eq(complaints.filerNameHash, await hashName(name)), ...(issue ? [eq(complaints.issueNumber, issue)] : [])))
-      .orderBy(complaints.createdAt);
-    const mapped = records.map((record) => ({ ...record, journey: JSON.parse(record.journeyJson || "[]") as JourneyUpdate[] }));
-    const record = mapped[0];
-    if (!record) {
-      return Response.json(
-        { error: "No complaint matched that issue number and filer name." },
-        { status: 404 },
-      );
+
+    // 1. Logged in dashboard: request for all current user's complaints
+    if (mine) {
+      if (!user) {
+        return Response.json({ error: "Sign in required." }, { status: 401 });
+      }
+      const userRecords = await db
+        .select()
+        .from(complaints)
+        .where(
+          or(
+            eq(complaints.userId, user.id),
+            eq(complaints.filerNameHash, await hashName(user.fullName || user.email)),
+          ),
+        )
+        .orderBy(desc(complaints.id));
+
+      const mapped = userRecords.map((r) => ({
+        ...r,
+        journey: JSON.parse(r.journeyJson || "[]") as JourneyUpdate[],
+      }));
+      return Response.json({ complaints: mapped });
     }
-    return issue ? Response.json({ complaint: record }) : Response.json({ complaints: mapped });
+
+    // 2. Direct Issue Lookup (Public or authenticated)
+    if (issue) {
+      if (!/^JS-\d{4}-[A-Z0-9]{5}-[A-Z0-9]{5}$/.test(issue)) {
+        return Response.json({ error: "Invalid issue registration number format." }, { status: 400 });
+      }
+      const [record] = await db
+        .select()
+        .from(complaints)
+        .where(eq(complaints.issueNumber, issue))
+        .limit(1);
+
+      if (!record) {
+        return Response.json({ error: "No complaint found with that registration number." }, { status: 404 });
+      }
+
+      // If name was provided for extra verification, check name match
+      if (name && name.length >= 2) {
+        const expectedHash = await hashName(name);
+        if (record.filerNameHash !== expectedHash && record.userId !== user?.id) {
+          return Response.json({ error: "The provided name does not match this registration number." }, { status: 403 });
+        }
+      }
+
+      return Response.json({
+        complaint: {
+          ...record,
+          journey: JSON.parse(record.journeyJson || "[]") as JourneyUpdate[],
+        },
+      });
+    }
+
+    // 3. Name based lookup for guest track
+    if (name.length >= 2) {
+      const records = await db
+        .select()
+        .from(complaints)
+        .where(eq(complaints.filerNameHash, await hashName(name)))
+        .orderBy(desc(complaints.id));
+
+      if (!records.length) {
+        return Response.json({ error: "No grievances found under that name." }, { status: 404 });
+      }
+
+      const mapped = records.map((r) => ({
+        ...r,
+        journey: JSON.parse(r.journeyJson || "[]") as JourneyUpdate[],
+      }));
+      return Response.json({ complaints: mapped });
+    }
+
+    return Response.json({ error: "Specify an issue number, filer name, or mine=1." }, { status: 400 });
   } catch (error) {
     return Response.json({ error: databaseError(error) }, { status: 500 });
   }
 }
+
